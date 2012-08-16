@@ -19,7 +19,7 @@
 #ifndef USBBUSINTERFACE_H
 #define USBBUSINTERFACE_H
 
-#include "mbed.h"
+// #include "mbed.h"
 #include "USBEndpoints.h"
 
 class USBHAL {

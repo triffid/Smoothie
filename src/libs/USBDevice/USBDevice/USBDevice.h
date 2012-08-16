@@ -19,14 +19,16 @@
 #ifndef USBDEVICE_H
 #define USBDEVICE_H
 
-#include "mbed.h"
+// #include "mbed.h"
 #include "USBDevice_Types.h"
 #include "USBHAL.h"
+
+#include "../descriptor.h"
 
 class USBDevice: public USBHAL
 {
 public:
-    USBDevice(uint16_t vendor_id, uint16_t product_id, uint16_t product_release);
+    USBDevice();
 
     /*
     * Check if the device is configured
@@ -34,6 +36,11 @@ public:
     * @returns true if configured, false otherwise
     */
     bool configured(void);
+
+    /*
+     * Pass a list of descriptors
+     */
+    bool setDescriptors(usbdesc_base ** descriptors);
 
     /*
     * Connect a device
@@ -162,68 +169,69 @@ public:
      */
     virtual bool USBCallback_setInterface(uint16_t interface, uint8_t alternate) { return false; };
 
-    /*
-    * Get device descriptor. Warning: this method has to store the length of the report descriptor in reportLength.
-    *
-    * @returns pointer to the device descriptor
-    */
-    virtual uint8_t * deviceDesc();
+//     /*
+//     * Get device descriptor. Warning: this method has to store the length of the report descriptor in reportLength.
+//     *
+//     * @returns pointer to the device descriptor
+//     */
+//     virtual uint8_t * deviceDesc() {return NULL;};
+//
+//     /*
+//     * Get configuration descriptor
+//     *
+//     * @returns pointer to the configuration descriptor
+//     */
+//     virtual uint8_t * configurationDesc() {return NULL;};
+//
+//     /*
+//     * Get string lang id descriptor
+//     *
+//     * @return pointer to the string lang id descriptor
+//     */
+//     virtual uint8_t * stringLangidDesc();
+//
+//     /*
+//     * Get string manufacturer descriptor
+//     *
+//     * @returns pointer to the string manufacturer descriptor
+//     */
+//     virtual uint8_t * stringImanufacturerDesc();
+//
+//     /*
+//     * Get string product descriptor
+//     *
+//     * @returns pointer to the string product descriptor
+//     */
+//     virtual uint8_t * stringIproductDesc();
+//
+//     /*
+//     * Get string serial descriptor
+//     *
+//     * @returns pointer to the string serial descriptor
+//     */
+//     virtual uint8_t * stringIserialDesc();
+//
+//     /*
+//     * Get string configuration descriptor
+//     *
+//     * @returns pointer to the string configuration descriptor
+//     */
+//     virtual uint8_t * stringIConfigurationDesc();
+//
+//     /*
+//     * Get string interface descriptor
+//     *
+//     * @returns pointer to the string interface descriptor
+//     */
+//     virtual uint8_t * stringIinterfaceDesc();
+//
+//     /*
+//     * Get the length of the report descriptor
+//     *
+//     * @returns length of the report descriptor
+//     */
+//     virtual uint16_t reportDescLength() { return 0; };
 
-    /*
-    * Get configuration descriptor
-    *
-    * @returns pointer to the configuration descriptor
-    */
-    virtual uint8_t * configurationDesc(){return NULL;};
-
-    /*
-    * Get string lang id descriptor
-    *
-    * @return pointer to the string lang id descriptor
-    */
-    virtual uint8_t * stringLangidDesc();
-
-    /*
-    * Get string manufacturer descriptor
-    *
-    * @returns pointer to the string manufacturer descriptor
-    */
-    virtual uint8_t * stringImanufacturerDesc();
-
-    /*
-    * Get string product descriptor
-    *
-    * @returns pointer to the string product descriptor
-    */
-    virtual uint8_t * stringIproductDesc();
-
-    /*
-    * Get string serial descriptor
-    *
-    * @returns pointer to the string serial descriptor
-    */
-    virtual uint8_t * stringIserialDesc();
-
-    /*
-    * Get string configuration descriptor
-    *
-    * @returns pointer to the string configuration descriptor
-    */
-    virtual uint8_t * stringIConfigurationDesc();
-
-    /*
-    * Get string interface descriptor
-    *
-    * @returns pointer to the string interface descriptor
-    */
-    virtual uint8_t * stringIinterfaceDesc();
-
-    /*
-    * Get the length of the report descriptor
-    *
-    * @returns length of the report descriptor
-    */
-    virtual uint16_t reportDescLength() { return 0; };
 
 
 
@@ -235,6 +243,7 @@ protected:
     virtual void connectStateChanged(unsigned int connected);
     virtual void suspendStateChanged(unsigned int suspended);
     uint8_t * findDescriptor(uint8_t descriptorType);
+    uint8_t * findDescriptor(uint8_t descriptorType, uint8_t descriptorIndex);
     CONTROL_TRANSFER * getTransferPtr(void);
 
     uint16_t VENDOR_ID;
@@ -257,6 +266,9 @@ private:
     bool requestGetConfiguration(void);
     bool requestGetInterface(void);
     bool requestSetInterface(void);
+    bool assembleConfigDescriptor(void);
+
+    usbdesc_base **descriptors;
 
     CONTROL_TRANSFER transfer;
     USB_DEVICE device;
