@@ -18,7 +18,7 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 #
-# Updates: 
+# Updates:
 #    Arthur Wolf & Adam Green in 2011 - Updated to work with mbed.
 ###############################################################################
 # USAGE:
@@ -36,7 +36,7 @@
 #                                APIs like printf(), scanf(), etc. aren't used.
 #   GCC4MBED_TYPE: Type of build to produce.  Allowed values are:
 #                  Debug - Build for debugging.  Disables optimizations and
-#                          links in debug MRI runtime.  Best debugging 
+#                          links in debug MRI runtime.  Best debugging
 #                          experience.
 #                  Release - Build for release with no debug support.
 #                  Checked - Release build with debug support.  Due to
@@ -63,7 +63,7 @@
 #       LIBS_SUFFIX=
 #
 #       include ../../build/gcc4mbed.mk
-#      
+#
 ###############################################################################
 
 # Check for undefined variables.
@@ -130,7 +130,7 @@ INCDIRS += $(PROJINCS) $(EXTERNAL_DIR)/mbed $(EXTERNAL_DIR)/mbed/LPC1768 $(EXTER
 
 # DEFINEs to be used when building C/C++ code
 DEFINES = -DTARGET_LPC1768 -DGCC4MBED_DELAYED_STDIO_INIT=$(GCC4MBED_DELAYED_STDIO_INIT)
-DEFINES += -DMRI_ENABLE=$(MRI_ENABLE) -DMRI_INIT_PARAMETERS='"$(MRI_INIT_PARAMETERS)"' -DMRI_BREAK_ON_INIT=$(MRI_BREAK_ON_INIT) 
+DEFINES += -DMRI_ENABLE=$(MRI_ENABLE) -DMRI_INIT_PARAMETERS='"$(MRI_INIT_PARAMETERS)"' -DMRI_BREAK_ON_INIT=$(MRI_BREAK_ON_INIT)
 DEFINES += -DMRI_SEMIHOST_STDIO=$(MRI_SEMIHOST_STDIO)
 
 # Libraries to be linked into final binary
@@ -167,17 +167,21 @@ endif
 all:: $(PROJECT).hex $(PROJECT).bin $(PROJECT).disasm
 
 $(PROJECT).bin: $(PROJECT).elf
-	$(OBJCOPY) -O binary $(PROJECT).elf $(PROJECT).bin
+	@echo "  COPY  " $@
+	@$(OBJCOPY) -O binary $(PROJECT).elf $(PROJECT).bin
 
 $(PROJECT).hex: $(PROJECT).elf
-	$(OBJCOPY) -R .stack -O ihex $(PROJECT).elf $(PROJECT).hex
-	
+	@echo "  COPY  " $@
+	@$(OBJCOPY) -R .stack -O ihex $(PROJECT).elf $(PROJECT).hex
+
 $(PROJECT).disasm: $(PROJECT).elf
-	$(OBJDUMP) -d $(PROJECT).elf >$(PROJECT).disasm
-	
+	@echo "  DUMP  " $@
+	@$(OBJDUMP) -d $(PROJECT).elf >$(PROJECT).disasm
+
 $(PROJECT).elf: $(LSCRIPT) $(OBJECTS) $(LIBS)
-	$(LD) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $(PROJECT).elf
-	$(SIZE) $(PROJECT).elf
+	@echo "  LD    " $@
+	@$(LD) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $(PROJECT).elf
+	@$(SIZE) $(PROJECT).elf
 
 clean:
 	$(REMOVE) -f $(OBJECTS)
@@ -198,12 +202,15 @@ endif
 #  and assemble .s files to .o
 
 .c.o :
-	$(GPP) $(GPFLAGS) -c $< -o $(<:.c=.o)
+	@echo "  CC    " $@
+	@$(GPP) $(GPFLAGS) -c $< -o $(<:.c=.o)
 
 .cpp.o :
-	$(GPP) $(GPFLAGS) -c $< -o $(<:.cpp=.o)
+	@echo "  CPP   " $@
+	@$(GPP) $(GPFLAGS) -c $< -o $(<:.cpp=.o)
 
 .S.o :
+	@echo "  AS    " $@
 	$(AS) $(ASFLAGS) -c $< -o $(<:.S=.o)
 
 #########################################################################
