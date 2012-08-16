@@ -698,14 +698,14 @@ void USBCDCMSC::setSense (uint8_t sense_key, uint8_t asc, uint8_t ascq) {
     sense.sense_key = sense_key;
     sense.additional_sense_length = 0x0a;
     sense.asc = asc;
-    sense.ascq = ascq;    
+    sense.ascq = ascq;
 }
 
 bool USBCDCMSC::requestSense (void) {
     if (!msd_write((uint8_t *)&sense, sizeof(sense))) {
         return false;
     }
-	
+
     return true;
 }
 
@@ -908,11 +908,11 @@ int USBCDCMSC::disk_initialize() {
 }
 
 int USBCDCMSC::disk_write(const char *buffer, int block_number) {
-    return _sd->disk_write(buffer, block_number);    
+    return _sd->disk_write(buffer, block_number);
 }
 
-int USBCDCMSC::disk_read(char *buffer, int block_number) {        
-    return _sd->disk_read(buffer, block_number);    
+int USBCDCMSC::disk_read(char *buffer, int block_number) {
+    return _sd->disk_read(buffer, block_number);
 }
 
 int USBCDCMSC::disk_status() {
@@ -920,7 +920,7 @@ int USBCDCMSC::disk_status() {
 }
 
 int USBCDCMSC::disk_sectors() {
-     return _sd->disk_sectors(); 
+     return _sd->disk_sectors();
 }
 int USBCDCMSC::disk_size() {
     return _sd->disk_sectors() * 512;
@@ -951,12 +951,12 @@ void USBCDCMSC::on_main_loop(void* argument){
            char c;
            this->buffer.pop_front(c);
            if( c == '\n' ){
-                struct SerialMessage message; 
+                struct SerialMessage message;
                 message.message = received;
                 message.stream = this;
-                this->kernel->call_event(ON_CONSOLE_LINE_RECEIVED, &message ); 
-               //this->kernel->serial->printf("received: %s \r\n", received.c_str() ); 
-               //this->printf("received: %s\r\n", received.c_str() ); 
+                this->kernel->call_event(ON_CONSOLE_LINE_RECEIVED, &message );
+               //this->kernel->serial->printf("received: %s \r\n", received.c_str() );
+               //this->printf("received: %s\r\n", received.c_str() );
                return;
             }else{
                 received += c;
@@ -972,10 +972,10 @@ void USBCDCMSC::on_serial_char_received(){
         char received = this->_getc();
         // convert CR to NL (for host OSs that don't send NL)
         if( received == '\r' ){ received = '\n'; }
-        //if( this->kernel != NULL ){ 
-        //    this->kernel->serial->printf("received:%c\r\n", received); 
-        //} 
-        this->buffer.push_back(received); 
+        //if( this->kernel != NULL ){
+        //    this->kernel->serial->printf("received:%c\r\n", received);
+        //}
+        this->buffer.push_back(received);
     }
 
 }

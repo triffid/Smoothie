@@ -39,35 +39,35 @@ public:
     USBCDC(uint16_t vendor_id, uint16_t product_id, uint16_t product_release);
 
 protected:
-    
+
     /*
     * Get device descriptor. Warning: this method has to store the length of the report descriptor in reportLength.
     *
     * @returns pointer to the device descriptor
     */
     virtual uint8_t * deviceDesc();
-    
+
     /*
     * Get string product descriptor
     *
     * @returns pointer to the string product descriptor
     */
     virtual uint8_t * stringIproductDesc();
-    
+
     /*
     * Get string interface descriptor
     *
     * @returns pointer to the string interface descriptor
     */
     virtual uint8_t * stringIinterfaceDesc();
-    
+
     /*
     * Get configuration descriptor
     *
     * @returns pointer to the configuration descriptor
     */
     virtual uint8_t * configurationDesc();
-    
+
     /*
     * Send a buffer
     *
@@ -77,7 +77,7 @@ protected:
     * @returns true if successful
     */
     bool send(uint8_t * buffer, uint32_t size);
-    
+
     /*
     * Read a buffer from a certain endpoint. Warning: blocking
     *
@@ -88,7 +88,7 @@ protected:
     * @returns true if successful
     */
     bool readEP(uint8_t * buffer, uint32_t * size);
-    
+
     /*
     * Read a buffer from a certain endpoint. Warning: non blocking
     *

@@ -288,7 +288,7 @@ uint32_t USBHAL::endpointReadcore(uint8_t endpoint, uint8_t *buffer) {
         SIEselectEndpoint(endpoint);
         SIEclearBuffer();
     }
-    
+
     return size;
 }
 
@@ -445,7 +445,7 @@ EP_STATUS USBHAL::endpointReadResult(uint8_t endpoint, uint8_t * buffer, uint32_
         if (!(epComplete & EP(endpoint)))
             return EP_PENDING;
     }
-    
+
     *bytesRead = endpointReadcore(endpoint, buffer);
     epComplete &= ~EP(endpoint);
     return EP_COMPLETED;

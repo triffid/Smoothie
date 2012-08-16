@@ -52,7 +52,7 @@ public:
     bool realiseEndpoint(uint8_t endpoint, uint32_t maxPacket, uint32_t options);
     bool getEndpointStallState(unsigned char endpoint);
     uint32_t endpointReadcore(uint8_t endpoint, uint8_t *buffer);
-    
+
 protected:
     virtual void busReset(void){};
     virtual void EP0setupCallback(void){};
@@ -67,7 +67,7 @@ protected:
     virtual bool EP2_IN_callback(){return false;};
     virtual bool EP3_OUT_callback(){return false;};
     virtual bool EP3_IN_callback(){return false;};
-    
+
 private:
     void usbisr(void);
     static void _usbisr(void);
