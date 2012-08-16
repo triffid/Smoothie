@@ -135,7 +135,7 @@ void USBMSD::reset() {
 
 // Called in ISR context called when a data is received
 bool USBMSD::EP2_OUT_callback() {
-    uint16_t size = 0;
+    uint32_t size = 0;
     uint8_t buf[MAX_PACKET_SIZE_EPBULK];
     readEP(EPBULK_OUT, buf, &size, MAX_PACKET_SIZE_EPBULK);
     switch (stage) {

@@ -18,7 +18,6 @@
 
 #include "stdint.h"
 #include "USBMIDI.h"
-#include "USBBusInterface.h"
 
 
 USBMIDI::USBMIDI(uint16_t vendor_id, uint16_t product_id, uint16_t product_release): USBDevice(vendor_id, product_id, product_release) {
@@ -38,7 +37,7 @@ void USBMIDI::attach(void (*fptr)(MIDIMessage)) {
 
 bool USBMIDI::EP2_OUT_callback() {
     uint8_t buf[64];
-    uint16_t len;
+    uint32_t len;
     readEP(EPBULK_OUT, buf, &len, 64);
 
     if (midi_evt != NULL) {

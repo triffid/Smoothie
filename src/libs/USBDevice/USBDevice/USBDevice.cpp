@@ -1,17 +1,28 @@
-/* USBDevice.c */
-/* Generic USB device */
-/* Copyright (c) 2011 ARM Limited. All rights reserved. */
-
-/* Reference: */
-/* Universal Serial Bus Specification Revision 2.0, Chapter 9 "USB Device Framework" */
+/* Copyright (c) 2010-2011 mbed.org, MIT License
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+* and associated documentation files (the "Software"), to deal in the Software without
+* restriction, including without limitation the rights to use, copy, modify, merge, publish,
+* distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+* Software is furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all copies or
+* substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+* BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+* NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+* DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
 
 #include "stdint.h"
 
 #include "USBEndpoints.h"
 #include "USBDevice.h"
 #include "USBDescriptor.h"
-#include "USBHID_Types.h"
 
+//#define DEBUG
 
 /* Device status */
 #define DEVICE_STATUS_SELF_POWERED  (1U<<0)
@@ -32,7 +43,9 @@
 bool USBDevice::requestGetDescriptor(void)
 {
     bool success = false;
-
+#ifdef DEBUG
+    printf("get descr: type: %d\r\n", DESCRIPTOR_TYPE(transfer.setup.wValue));
+#endif
     switch (DESCRIPTOR_TYPE(transfer.setup.wValue))
     {
         case DEVICE_DESCRIPTOR:
@@ -41,6 +54,9 @@ bool USBDevice::requestGetDescriptor(void)
                 if ((deviceDesc()[0] == DEVICE_DESCRIPTOR_LENGTH) \
                     && (deviceDesc()[1] == DEVICE_DESCRIPTOR))
                 {
+#ifdef DEBUG
+                    printf("device descr\r\n");
+#endif
                     transfer.remaining = DEVICE_DESCRIPTOR_LENGTH;
                     transfer.ptr = deviceDesc();
                     transfer.direction = DEVICE_TO_HOST;
@@ -54,6 +70,9 @@ bool USBDevice::requestGetDescriptor(void)
                 if ((configurationDesc()[0] == CONFIGURATION_DESCRIPTOR_LENGTH) \
                     && (configurationDesc()[1] == CONFIGURATION_DESCRIPTOR))
                 {
+#ifdef DEBUG
+                    printf("conf descr request\r\n");
+#endif
                     /* Get wTotalLength */
                     transfer.remaining = configurationDesc()[2] \
                         | (configurationDesc()[3] << 8);
@@ -65,39 +84,60 @@ bool USBDevice::requestGetDescriptor(void)
             }
             break;
         case STRING_DESCRIPTOR:
+#ifdef DEBUG
+            printf("str descriptor\r\n");
+#endif
             switch (DESCRIPTOR_INDEX(transfer.setup.wValue))
             {
                             case STRING_OFFSET_LANGID:
+#ifdef DEBUG
+                                printf("1\r\n");
+#endif
                                 transfer.remaining = stringLangidDesc()[0];
                                 transfer.ptr = stringLangidDesc();
                                 transfer.direction = DEVICE_TO_HOST;
                                 success = true;
                                 break;
                             case STRING_OFFSET_IMANUFACTURER:
+#ifdef DEBUG
+                                printf("2\r\n");
+#endif
                                 transfer.remaining =  stringImanufacturerDesc()[0];
                                 transfer.ptr = stringImanufacturerDesc();
                                 transfer.direction = DEVICE_TO_HOST;
                                 success = true;
                                 break;       
                             case STRING_OFFSET_IPRODUCT:
+#ifdef DEBUG
+                                printf("3\r\n");
+#endif
                                 transfer.remaining = stringIproductDesc()[0];
                                 transfer.ptr = stringIproductDesc();
                                 transfer.direction = DEVICE_TO_HOST;
                                 success = true;
                                 break;            
                             case STRING_OFFSET_ISERIAL:
+#ifdef DEBUG
+                                printf("4\r\n");
+#endif
                                 transfer.remaining = stringIserialDesc()[0];
                                 transfer.ptr = stringIserialDesc();
                                 transfer.direction = DEVICE_TO_HOST;
                                 success = true;
                                 break;        
                             case STRING_OFFSET_ICONFIGURATION:
+#ifdef DEBUG
+                                printf("5\r\n");
+#endif
                                 transfer.remaining = stringIConfigurationDesc()[0];
                                 transfer.ptr = stringIConfigurationDesc();
                                 transfer.direction = DEVICE_TO_HOST;
                                 success = true;
                                 break; 
                             case STRING_OFFSET_IINTERFACE:
+#ifdef DEBUG
+                                printf("6\r\n");
+#endif
                                 transfer.remaining = stringIinterfaceDesc()[0];
                                 transfer.ptr = stringIinterfaceDesc();
                                 transfer.direction = DEVICE_TO_HOST;
@@ -106,10 +146,19 @@ bool USBDevice::requestGetDescriptor(void)
             }
             break;
         case INTERFACE_DESCRIPTOR:
+#ifdef DEBUG
+            printf("interface descr\r\n");
+#endif
         case ENDPOINT_DESCRIPTOR:
+#ifdef DEBUG
+            printf("endpoint descr\r\n");
+#endif
             /* TODO: Support is optional, not implemented here */
             break;
         default:
+#ifdef DEBUG
+            printf("ERROR\r\n");
+#endif
             break;
     }
 
@@ -496,6 +545,16 @@ bool USBDevice::controlSetup(void)
     transfer.direction = 0;
     transfer.zlp = false;
     transfer.notify = false;
+    
+#ifdef DEBUG
+    printf("dataTransferDirection: %d\r\nType: %d\r\nRecipient: %d\r\nbRequest: %d\r\nwValue: %d\r\nwIndex: %d\r\nwLength: %d\r\n",transfer.setup.bmRequestType.dataTransferDirection,
+                                                                                                                                   transfer.setup.bmRequestType.Type,
+                                                                                                                                   transfer.setup.bmRequestType.Recipient,
+                                                                                                                                   transfer.setup.bRequest,
+                                                                                                                                   transfer.setup.wValue,
+                                                                                                                                   transfer.setup.wIndex,
+                                                                                                                                   transfer.setup.wLength);
+#endif
 
     /* Class / vendor specific */
     success = USBCallback_request();
@@ -505,6 +564,9 @@ bool USBDevice::controlSetup(void)
         /* Standard requests */
         if (!requestSetup())
         {
+#ifdef DEBUG
+            printf("fail!!!!\r\n");
+#endif
             return false;
         }
     }
@@ -623,6 +685,9 @@ void USBDevice::EP0out(void)
 
 void USBDevice::EP0in(void)
 {
+#ifdef DEBUG
+    printf("EP0IN\r\n");
+#endif
     /* Endpoint 0 IN data event */
     if (!controlIn())
     {
@@ -735,13 +800,13 @@ USBDevice::USBDevice(uint16_t vendor_id, uint16_t product_id, uint16_t product_r
 };
 
 
-bool USBDevice::readStart(uint8_t endpoint, uint16_t maxSize)
+bool USBDevice::readStart(uint8_t endpoint, uint32_t maxSize)
 {
     return endpointRead(endpoint, maxSize) == EP_PENDING;
 }
 
 
-bool USBDevice::write(uint8_t endpoint, uint8_t * buffer, uint16_t size, uint16_t maxSize)
+bool USBDevice::write(uint8_t endpoint, uint8_t * buffer, uint32_t size, uint32_t maxSize)
 {
     EP_STATUS result;
 
@@ -772,7 +837,7 @@ bool USBDevice::write(uint8_t endpoint, uint8_t * buffer, uint16_t size, uint16_
 }
 
 
-bool USBDevice::writeNB(uint8_t endpoint, uint8_t * buffer, uint16_t size, uint16_t maxSize)
+bool USBDevice::writeNB(uint8_t endpoint, uint8_t * buffer, uint32_t size, uint32_t maxSize)
 {
     EP_STATUS result;
 
@@ -800,7 +865,7 @@ bool USBDevice::writeNB(uint8_t endpoint, uint8_t * buffer, uint16_t size, uint1
 
 
 
-bool USBDevice::readEP(uint8_t endpoint, uint8_t * buffer, uint16_t * size, uint16_t maxSize)
+bool USBDevice::readEP(uint8_t endpoint, uint8_t * buffer, uint32_t * size, uint32_t maxSize)
 {
     EP_STATUS result;
     
@@ -810,14 +875,14 @@ bool USBDevice::readEP(uint8_t endpoint, uint8_t * buffer, uint16_t * size, uint
 
     /* Wait for completion */
     do {
-        result = endpointReadResult(endpoint, buffer, (uint32_t *)size);
+        result = endpointReadResult(endpoint, buffer, size);
     } while ((result == EP_PENDING) && configured());
 
     return (result == EP_COMPLETED);
 }
 
 
-bool USBDevice::readEP_NB(uint8_t endpoint, uint8_t * buffer, uint16_t * size, uint16_t maxSize)
+bool USBDevice::readEP_NB(uint8_t endpoint, uint8_t * buffer, uint32_t * size, uint32_t maxSize)
 {
     EP_STATUS result;
     
@@ -825,7 +890,7 @@ bool USBDevice::readEP_NB(uint8_t endpoint, uint8_t * buffer, uint16_t * size, u
         return false;
     }
 
-    result = endpointReadResult(endpoint, buffer, (uint32_t *)size);
+    result = endpointReadResult(endpoint, buffer, size);
     
     return (result == EP_COMPLETED);
 }

@@ -1,10 +1,24 @@
-// USBBusInterface_LPC17_LPC23.c
-// USB Bus Interface for NXP LPC1768 and LPC2368
-// Copyright (c) 2011 ARM Limited. All rights reserved.
+/* Copyright (c) 2010-2011 mbed.org, MIT License
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+* and associated documentation files (the "Software"), to deal in the Software without
+* restriction, including without limitation the rights to use, copy, modify, merge, publish,
+* distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+* Software is furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all copies or
+* substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+* BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+* NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+* DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
 
 #ifdef TARGET_LPC1768
 
-#include "USBBusInterface.h"
+#include "USBHAL.h"
 
 
 // Get endpoint direction
@@ -538,9 +552,20 @@ void USBHAL::usbisr(void) {
 
         // Read device status from SIE
         devStat = SIEgetDeviceStatus();
+        //printf("devStat: %d\r\n", devStat);
+
+        if (devStat & SIE_DS_SUS_CH) {
+            // Suspend status changed
+            if((devStat & SIE_DS_SUS) != 0) {
+                suspendStateChanged(0);
+            }
+        }
 
         if (devStat & SIE_DS_RST) {
             // Bus reset
+            if((devStat & SIE_DS_SUS) == 0) {
+                suspendStateChanged(1);
+            }
             busReset();
         }
     }
@@ -612,22 +637,6 @@ void USBHAL::usbisr(void) {
             LPC_USB->USBDevIntClr = EP_SLOW;
             if (EP3_OUT_callback())
                 epComplete &= ~EP(EP3OUT);
-        }
-
-        if (LPC_USB->USBEpIntSt & EP(EP5IN)) {
-            selectEndpointClearInterrupt(EP5IN);
-            epComplete |= EP(EP5IN);
-            LPC_USB->USBDevIntClr = EP_SLOW;
-            if (EP5_IN_callback())
-                epComplete &= ~EP(EP5IN);
-        }
-
-        if (LPC_USB->USBEpIntSt & EP(EP5OUT)) {
-            selectEndpointClearInterrupt(EP5OUT);
-            epComplete |= EP(EP5OUT);
-            LPC_USB->USBDevIntClr = EP_SLOW;
-            if (EP5_OUT_callback())
-                epComplete &= ~EP(EP5OUT);
         }
     }
 }

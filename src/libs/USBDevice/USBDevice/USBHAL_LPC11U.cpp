@@ -1,13 +1,24 @@
-// USBBusInterface_LPC11U.c
-// USB Bus Interface for NXP LPC11Uxx
-// Copyright (c) 2011 ARM Limited. All rights reserved.
-
-// Reference:
-// NXP UM10462 LPC11U1x User manual Rev. 1 &#65533; 14 April 2011
+/* Copyright (c) 2010-2011 mbed.org, MIT License
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+* and associated documentation files (the "Software"), to deal in the Software without
+* restriction, including without limitation the rights to use, copy, modify, merge, publish,
+* distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+* Software is furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all copies or
+* substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+* BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+* NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+* DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
 
 #ifdef TARGET_LPC11U24
 
-#include "USBBusInterface.h"
+#include "USBHAL.h"
 
 USBHAL * USBHAL::instance;
 
@@ -574,7 +585,6 @@ void USBHAL::_usbisr(void) {
     instance->usbisr();
 }
 
-
 void USBHAL::usbisr(void) {
     // Start of frame
     if (LPC_USB->INTSTAT & FRAME_INT) {
@@ -589,23 +599,19 @@ void USBHAL::usbisr(void) {
     if (LPC_USB->INTSTAT & DEV_INT) {
         LPC_USB->INTSTAT = DEV_INT;
 
-        if (LPC_USB->DEVCMDSTAT & DCON_C) {
-            // Connect status changed
-            LPC_USB->DEVCMDSTAT = devCmdStat | DCON_C;
-
-            connectStateChanged((LPC_USB->DEVCMDSTAT & DCON) != 0);
-        }
-
         if (LPC_USB->DEVCMDSTAT & DSUS_C) {
             // Suspend status changed
             LPC_USB->DEVCMDSTAT = devCmdStat | DSUS_C;
-
-            suspendStateChanged((LPC_USB->DEVCMDSTAT & DSUS) != 0);
+            if((LPC_USB->DEVCMDSTAT & DSUS) != 0) {
+                suspendStateChanged(1);
+            }
         }
 
         if (LPC_USB->DEVCMDSTAT & DRES_C) {
             // Bus reset
             LPC_USB->DEVCMDSTAT = devCmdStat | DRES_C;
+
+            suspendStateChanged(0);
 
             // Disable endpoints > 0
             disableEndpoints();

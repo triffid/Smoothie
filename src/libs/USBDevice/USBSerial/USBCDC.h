@@ -26,8 +26,6 @@
 
 #include "USBDevice.h"
 
-
-
 class USBCDC: public USBDevice {
 public:
 
@@ -78,7 +76,7 @@ protected:
     * @param size length of the buffer
     * @returns true if successful
     */
-    bool send(uint8_t * buffer, uint16_t size);
+    bool send(uint8_t * buffer, uint32_t size);
     
     /*
     * Read a buffer from a certain endpoint. Warning: blocking
@@ -89,7 +87,7 @@ protected:
     * @param maxSize the maximum length that can be read
     * @returns true if successful
     */
-    bool readEP(uint8_t * buffer, uint16_t * size);
+    bool readEP(uint8_t * buffer, uint32_t * size);
     
     /*
     * Read a buffer from a certain endpoint. Warning: non blocking
@@ -100,7 +98,7 @@ protected:
     * @param maxSize the maximum length that can be read
     * @returns true if successful
     */
-    bool readEP_NB(uint8_t * buffer, uint16_t * size);
+    bool readEP_NB(uint8_t * buffer, uint32_t * size);
 
     virtual bool USBCallback_request();
     virtual bool USBCallback_setConfiguration(uint8_t configuration);

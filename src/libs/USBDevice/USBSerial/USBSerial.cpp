@@ -18,8 +18,6 @@
 
 #include "stdint.h"
 #include "USBSerial.h"
-#include "USBBusInterface.h"
-
 
 int USBSerial::_putc(int c) {
     send((uint8_t *)&c, 1);
@@ -48,7 +46,7 @@ bool USBSerial::writeBlock(uint8_t * buf, uint16_t size) {
 
 bool USBSerial::EP2_OUT_callback() {
     uint8_t c[65];
-    uint16_t size = 0;
+    uint32_t size = 0;
 
     //we read the packet received and put it on the circular buffer
     readEP(c, &size);
@@ -67,4 +65,3 @@ bool USBSerial::EP2_OUT_callback() {
 uint8_t USBSerial::available() {
     return buf.available();
 }
-

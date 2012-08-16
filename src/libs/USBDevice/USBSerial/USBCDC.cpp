@@ -18,7 +18,6 @@
 
 #include "stdint.h"
 #include "USBCDC.h"
-#include "USBBusInterface.h"
 
 static uint8_t cdc_line_coding[7]= {0x80, 0x25, 0x00, 0x00, 0x00, 0x00, 0x08};
 
@@ -84,11 +83,11 @@ bool USBCDC::USBCallback_setConfiguration(uint8_t configuration) {
     return true;
 }
 
-bool USBCDC::send(uint8_t * buffer, uint16_t size) {
+bool USBCDC::send(uint8_t * buffer, uint32_t size) {
     return USBDevice::write(EPBULK_IN, buffer, size, MAX_CDC_REPORT_SIZE);
 }
 
-bool USBCDC::readEP(uint8_t * buffer, uint16_t * size) {
+bool USBCDC::readEP(uint8_t * buffer, uint32_t * size) {
     if (!USBDevice::readEP(EPBULK_OUT, buffer, size, MAX_CDC_REPORT_SIZE))
         return false;
     if (!readStart(EPBULK_OUT, MAX_CDC_REPORT_SIZE))
@@ -96,7 +95,7 @@ bool USBCDC::readEP(uint8_t * buffer, uint16_t * size) {
     return true;
 }
 
-bool USBCDC::readEP_NB(uint8_t * buffer, uint16_t * size) {
+bool USBCDC::readEP_NB(uint8_t * buffer, uint32_t * size) {
     if (!USBDevice::readEP_NB(EPBULK_OUT, buffer, size, MAX_CDC_REPORT_SIZE))
         return false;
     if (!readStart(EPBULK_OUT, MAX_CDC_REPORT_SIZE))

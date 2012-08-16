@@ -1,6 +1,20 @@
-/* USBEndpoints_LPC17_LPC23.h */
-/* Endpoint configuration for LPC1768 and LPC2368 */
-/* Copyright (c) 2011 ARM Limited. All rights reserved. */
+/* Copyright (c) 2010-2011 mbed.org, MIT License
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+* and associated documentation files (the "Software"), to deal in the Software without
+* restriction, including without limitation the rights to use, copy, modify, merge, publish,
+* distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+* Software is furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all copies or
+* substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+* BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+* NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+* DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
 
 #define NUMBER_OF_LOGICAL_ENDPOINTS (16)
 #define NUMBER_OF_PHYSICAL_ENDPOINTS (NUMBER_OF_LOGICAL_ENDPOINTS * 2)
@@ -77,8 +91,3 @@
 #define MAX_PACKET_SIZE_EPBULK  (MAX_PACKET_SIZE_EP2)
 #define MAX_PACKET_SIZE_EPINT   (MAX_PACKET_SIZE_EP1)
 #define MAX_PACKET_SIZE_EPISO   (MAX_PACKET_SIZE_EP3)
-
-/* Bulk endpoints */
-#define MSDBULK_OUT  (EP5OUT)
-#define MSDBULK_IN   (EP5IN)
-#define MAX_PACKET_SIZE_MSDBULK  (MAX_PACKET_SIZE_EP5)

@@ -74,6 +74,9 @@
 #define CONTROL_MUTE                      0x0001
 #define CONTROL_VOLUME                    0x0002
 
+// Input Terminal Types
+#define TERMINAL_MICROPHONE               0x0201
+
 // Output Terminal Types
 #define TERMINAL_SPEAKER                  0x0301
 #define TERMINAL_HEADPHONES               0x0302

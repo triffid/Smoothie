@@ -26,7 +26,7 @@ typedef struct {
 
 #ifdef US_KEYBOARD
 /* US keyboard (as HID standard) */
-#define KEYMAP_SIZE (148)
+#define KEYMAP_SIZE (152)
 const KEYMAP keymap[KEYMAP_SIZE] = {
     {0, 0},             /* NUL */
     {0, 0},             /* SOH */
@@ -178,11 +178,16 @@ const KEYMAP keymap[KEYMAP_SIZE] = {
     {0x4a, 0},          /* HOME */
     {0x4b, 0},          /* PAGE_UP */
     {0x4e, 0},          /* PAGE_DOWN */
+    
+    {0x4f, 0},          /* RIGHT_ARROW */
+    {0x50, 0},          /* LEFT_ARROW */
+    {0x51, 0},          /* DOWN_ARROW */
+    {0x52, 0},          /* UP_ARROW */
 };
 
 #else
 /* UK keyboard */
-#define KEYMAP_SIZE (148)
+#define KEYMAP_SIZE (152)
 const KEYMAP keymap[KEYMAP_SIZE] = {
     {0, 0},             /* NUL */
     {0, 0},             /* SOH */
@@ -334,6 +339,11 @@ const KEYMAP keymap[KEYMAP_SIZE] = {
     {0x4a, 0},          /* HOME */
     {0x4b, 0},          /* PAGE_UP */
     {0x4e, 0},          /* PAGE_DOWN */
+    
+    {0x4f, 0},          /* RIGHT_ARROW */
+    {0x50, 0},          /* LEFT_ARROW */
+    {0x51, 0},          /* DOWN_ARROW */
+    {0x52, 0},          /* UP_ARROW */
 };
 #endif
 
@@ -539,7 +549,7 @@ uint8_t * USBMouseKeyboard::reportDesc() {
 }
 
 bool USBMouseKeyboard::EP1_OUT_callback() {
-    uint16_t bytesRead = 0;
+    uint32_t bytesRead = 0;
     uint8_t led[65];
     USBDevice::readEP(EPINT_OUT, led, &bytesRead, MAX_HID_REPORT_SIZE);
     

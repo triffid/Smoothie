@@ -1,15 +1,27 @@
-/* USBDevice.h */
-/* Generic USB device */
-/* Copyright (c) 2011 ARM Limited. All rights reserved. */
+/* Copyright (c) 2010-2011 mbed.org, MIT License
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+* and associated documentation files (the "Software"), to deal in the Software without
+* restriction, including without limitation the rights to use, copy, modify, merge, publish,
+* distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+* Software is furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all copies or
+* substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+* BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+* NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+* DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
 
 #ifndef USBDEVICE_H
 #define USBDEVICE_H
 
 #include "mbed.h"
 #include "USBDevice_Types.h"
-#include "USBBusInterface.h"
-
-
+#include "USBHAL.h"
 
 class USBDevice: public USBHAL
 {
@@ -50,7 +62,7 @@ public:
     * @param maxSize the maximum length that can be read
     * @return true if successful
     */
-    bool readStart(uint8_t endpoint, uint16_t maxSize);
+    bool readStart(uint8_t endpoint, uint32_t maxSize);
     
     /*
     * Read a certain endpoint. Before calling this function, USBUSBDevice_readStart
@@ -64,7 +76,7 @@ public:
     * @param maxSize the maximum length that can be read
     * @returns true if successful
     */
-    bool readEP(uint8_t endpoint, uint8_t * buffer, uint16_t * size, uint16_t maxSize);
+    bool readEP(uint8_t endpoint, uint8_t * buffer, uint32_t * size, uint32_t maxSize);
     
     /*
     * Read a certain endpoint.
@@ -77,7 +89,7 @@ public:
     * @param maxSize the maximum length that can be read
     * @returns true if successful
     */
-    bool readEP_NB(uint8_t endpoint, uint8_t * buffer, uint16_t * size, uint16_t maxSize);
+    bool readEP_NB(uint8_t endpoint, uint8_t * buffer, uint32_t * size, uint32_t maxSize);
     
     /*
     * Write a certain endpoint.
@@ -89,7 +101,7 @@ public:
     * @param size the number of bytes to write
     * @param maxSize the maximum length that can be written on this endpoint
     */
-    bool write(uint8_t endpoint, uint8_t * buffer, uint16_t size, uint16_t maxSize);
+    bool write(uint8_t endpoint, uint8_t * buffer, uint32_t size, uint32_t maxSize);
     
     
     /*
@@ -102,7 +114,7 @@ public:
     * @param size the number of bytes to write
     * @param maxSize the maximum length that can be written on this endpoint
     */
-    bool writeNB(uint8_t endpoint, uint8_t * buffer, uint16_t size, uint16_t maxSize);
+    bool writeNB(uint8_t endpoint, uint8_t * buffer, uint32_t size, uint32_t maxSize);
 
     
     /*
@@ -131,7 +143,7 @@ public:
     * @param buf buffer received on endpoint 0
     * @param length length of this buffer
     */
-    virtual void USBCallback_requestCompleted(uint8_t * buf, uint16_t length) {};
+    virtual void USBCallback_requestCompleted(uint8_t * buf, uint32_t length) {};
     
     /*
     * Called by USBDevice layer. Set configuration of the device.

@@ -31,7 +31,7 @@ typedef struct {
 
 #ifdef US_KEYBOARD
 /* US keyboard (as HID standard) */
-#define KEYMAP_SIZE (148)
+#define KEYMAP_SIZE (152)
 const KEYMAP keymap[KEYMAP_SIZE] = {
     {0, 0},             /* NUL */
     {0, 0},             /* SOH */
@@ -183,11 +183,16 @@ const KEYMAP keymap[KEYMAP_SIZE] = {
     {0x4a, 0},          /* HOME */
     {0x4b, 0},          /* PAGE_UP */
     {0x4e, 0},          /* PAGE_DOWN */
+    
+    {0x4f, 0},          /* RIGHT_ARROW */
+    {0x50, 0},          /* LEFT_ARROW */
+    {0x51, 0},          /* DOWN_ARROW */
+    {0x52, 0},          /* UP_ARROW */
 };
 
 #else
 /* UK keyboard */
-#define KEYMAP_SIZE (148)
+#define KEYMAP_SIZE (152)
 const KEYMAP keymap[KEYMAP_SIZE] = {
     {0, 0},             /* NUL */
     {0, 0},             /* SOH */
@@ -339,6 +344,11 @@ const KEYMAP keymap[KEYMAP_SIZE] = {
     {0x4a, 0},          /* HOME */
     {0x4b, 0},          /* PAGE_UP */
     {0x4e, 0},          /* PAGE_DOWN */
+    
+    {0x4f, 0},          /* RIGHT_ARROW */
+    {0x50, 0},          /* LEFT_ARROW */
+    {0x51, 0},          /* DOWN_ARROW */
+    {0x52, 0},          /* UP_ARROW */
 };
 #endif
 
@@ -411,7 +421,7 @@ uint8_t * USBKeyboard::reportDesc() {
 
 
 bool USBKeyboard::EP1_OUT_callback() {
-    uint16_t bytesRead = 0;
+    uint32_t bytesRead = 0;
     uint8_t led[65];
     USBDevice::readEP(EPINT_OUT, led, &bytesRead, MAX_HID_REPORT_SIZE);
     
@@ -482,4 +492,62 @@ bool USBKeyboard::mediaControl(MEDIA_KEY key) {
     report.length = 2;
 
     return send(&report);
+}
+
+
+#define DEFAULT_CONFIGURATION (1)
+#define TOTAL_DESCRIPTOR_LENGTH ((1 * CONFIGURATION_DESCRIPTOR_LENGTH) \
+                               + (1 * INTERFACE_DESCRIPTOR_LENGTH) \
+                               + (1 * HID_DESCRIPTOR_LENGTH) \
+                               + (2 * ENDPOINT_DESCRIPTOR_LENGTH))
+
+uint8_t * USBKeyboard::configurationDesc() {
+    static uint8_t configurationDescriptor[] = {
+        CONFIGURATION_DESCRIPTOR_LENGTH,// bLength
+        CONFIGURATION_DESCRIPTOR,       // bDescriptorType
+        LSB(TOTAL_DESCRIPTOR_LENGTH),   // wTotalLength (LSB)
+        MSB(TOTAL_DESCRIPTOR_LENGTH),   // wTotalLength (MSB)
+        0x01,                           // bNumInterfaces
+        DEFAULT_CONFIGURATION,          // bConfigurationValue
+        0x00,                           // iConfiguration
+        C_RESERVED | C_SELF_POWERED,    // bmAttributes
+        C_POWER(0),                     // bMaxPowerHello World from Mbed
+
+        INTERFACE_DESCRIPTOR_LENGTH,    // bLength
+        INTERFACE_DESCRIPTOR,           // bDescriptorType
+        0x00,                           // bInterfaceNumber
+        0x00,                           // bAlternateSetting
+        0x02,                           // bNumEndpoints
+        HID_CLASS,                      // bInterfaceClass
+        1,                              // bInterfaceSubClass
+        1,                              // bInterfaceProtocol (keyboard)
+        0x00,                           // iInterface
+
+        HID_DESCRIPTOR_LENGTH,          // bLength
+        HID_DESCRIPTOR,                 // bDescriptorType
+        LSB(HID_VERSION_1_11),          // bcdHID (LSB)
+        MSB(HID_VERSION_1_11),          // bcdHID (MSB)
+        0x00,                           // bCountryCode
+        0x01,                           // bNumDescriptors
+        REPORT_DESCRIPTOR,              // bDescriptorType
+        LSB(reportDescLength()),  // wDescriptorLength (LSB)
+        MSB(reportDescLength()),  // wDescriptorLength (MSB)
+
+        ENDPOINT_DESCRIPTOR_LENGTH,     // bLength
+        ENDPOINT_DESCRIPTOR,            // bDescriptorType
+        PHY_TO_DESC(EPINT_IN),          // bEndpointAddress
+        E_INTERRUPT,                    // bmAttributes
+        LSB(MAX_PACKET_SIZE_EPINT),     // wMaxPacketSize (LSB)
+        MSB(MAX_PACKET_SIZE_EPINT),     // wMaxPacketSize (MSB)
+        1,                             // bInterval (milliseconds)
+
+        ENDPOINT_DESCRIPTOR_LENGTH,     // bLength
+        ENDPOINT_DESCRIPTOR,            // bDescriptorType
+        PHY_TO_DESC(EPINT_OUT),          // bEndpointAddress
+        E_INTERRUPT,                    // bmAttributes
+        LSB(MAX_PACKET_SIZE_EPINT),     // wMaxPacketSize (LSB)
+        MSB(MAX_PACKET_SIZE_EPINT),     // wMaxPacketSize (MSB)
+        1,                             // bInterval (milliseconds)
+    };
+    return configurationDescriptor;
 }

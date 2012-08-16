@@ -27,23 +27,6 @@
 
 #include "USBDevice.h"
 
-
-
-#ifdef __GNUC__
-    /* Packing for structs in GCC. */
-    #define PACK_STRUCT_STRUCT __attribute__((packed))
-    #define PACK_STRUCT_BEGIN
-    #define PACK_STRUCT_END
-#else /* !__GNUC__ */
-    /* Packing for structs in ARM compiler. */
-    #define PACK_STRUCT_STRUCT
-    #define PACK_STRUCT_BEGIN __packed
-    #define PACK_STRUCT_END
-#endif /* __GNUC__ */
-
-
-
-
 /**
  * USBMSD class: generic class in order to use all kinds of blocks storage chip
  *
@@ -193,7 +176,7 @@ private:
     };
 
     // Bulk-only CBW
-    typedef PACK_STRUCT_BEGIN struct {
+    typedef __packed struct {
         uint32_t Signature;
         uint32_t Tag;
         uint32_t DataLength;
@@ -201,16 +184,15 @@ private:
         uint8_t  LUN;
         uint8_t  CBLength;
         uint8_t  CB[16];
-    } PACK_STRUCT_STRUCT CBW;
+    } CBW;
 
     // Bulk-only CSW
-    typedef PACK_STRUCT_BEGIN struct {
+    typedef __packed struct {
         uint32_t Signature;
         uint32_t Tag;
         uint32_t DataResidue;
         uint8_t  Status;
-    } PACK_STRUCT_STRUCT CSW;
-
+    } CSW;
 
     //state of the bulk-only state machine
     Stage stage;
