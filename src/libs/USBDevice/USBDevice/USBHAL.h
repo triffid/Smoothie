@@ -19,6 +19,8 @@
 #ifndef USBBUSINTERFACE_H
 #define USBBUSINTERFACE_H
 
+#include <stdint.h>
+
 // #include "mbed.h"
 #include "USBEndpoints.h"
 
@@ -53,8 +55,11 @@ public:
     bool getEndpointStallState(unsigned char endpoint);
     uint32_t endpointReadcore(uint8_t endpoint, uint8_t *buffer);
 
+    uint32_t getSerialNumber(int length, uint32_t *buf);
+
 protected:
     virtual void busReset(void){};
+    virtual void epIntHandler(uint8_t){};
     virtual void EP0setupCallback(void){};
     virtual void EP0out(void){};
     virtual void EP0in(void){};

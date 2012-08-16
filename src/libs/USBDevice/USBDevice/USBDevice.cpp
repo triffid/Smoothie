@@ -766,6 +766,10 @@ void USBDevice::EP0in(void)
     }
 }
 
+void USBDevice::epIntHandler(uint8_t bEP)
+{
+}
+
 bool USBDevice::configured(void)
 {
     /* Returns true if device is in the CONFIGURED state */

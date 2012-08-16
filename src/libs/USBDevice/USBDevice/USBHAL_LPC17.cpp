@@ -19,6 +19,8 @@
 #ifdef TARGET_LPC1768
 
 #include "USBHAL.h"
+#include <LPC17xx.h>
+#include <cmsis_nvic.h>
 
 
 // Get endpoint direction
@@ -362,7 +364,7 @@ USBHAL::USBHAL(void) {
     LPC_PINCON->PINSEL4 |= 0x00040000;
 
     // Connect must be low for at least 2.5uS
-    wait(0.3);
+//     wait(0.3);
 
     // Set the maximum packet size for the control endpoints
     realiseEndpoint(EP0IN, MAX_PACKET_SIZE_EP0, 0);
@@ -385,6 +387,26 @@ USBHAL::~USBHAL(void) {
 
     // Disable USB interrupts
     NVIC_DisableIRQ(USB_IRQn);
+}
+
+uint32_t USBHAL::getSerialNumber(int length, uint32_t *buf) {
+    #define IAP_LOCATION 0x1FFF1FF1
+    uint32_t command[1];
+    uint32_t result[5];
+    typedef void (*IAP)(uint32_t*, uint32_t*);
+    IAP iap = (IAP) IAP_LOCATION;
+
+    command[0] = 58;
+//     iprintf("Getting Serial...\n");
+    iap(command, result);
+//     iprintf("HW Serial Number: %08lX %08lX %08lX %08lX\n", result[1], result[2], result[3], result[4]);
+    int i;
+    for (i = 0; i < 4; i++) {
+        if (i < length) {
+            buf[i] = result[i + 1];
+        }
+    }
+    return i;
 }
 
 void USBHAL::connect(void) {
@@ -583,61 +605,86 @@ void USBHAL::usbisr(void) {
             }
             LPC_USB->USBDevIntClr = EP_SLOW;
         }
-
         if (LPC_USB->USBEpIntSt & EP(EP0IN)) {
             selectEndpointClearInterrupt(EP0IN);
             LPC_USB->USBDevIntClr = EP_SLOW;
             EP0in();
         }
 
-        // TODO: This should cover all endpoints, not just EP1,2,3:
-        if (LPC_USB->USBEpIntSt & EP(EP1IN)) {
-            selectEndpointClearInterrupt(EP1IN);
-            epComplete |= EP(EP1IN);
-            LPC_USB->USBDevIntClr = EP_SLOW;
-            if (EP1_IN_callback())
-                epComplete &= ~EP(EP1IN);
+        if (LPC_USB->USBEpIntSt & ~3) {
+            int i;
+            uint32_t bitmask;
+            for (i = 2, bitmask = 4; i < 32; i++, bitmask <<= 1) {
+                if (LPC_USB->USBEpIntSt & bitmask) {
+                    epIntHandler(IDX2EP(i));
+                }
+            }
         }
-
-        if (LPC_USB->USBEpIntSt & EP(EP1OUT)) {
-            selectEndpointClearInterrupt(EP1OUT);
-            epComplete |= EP(EP1OUT);
-            LPC_USB->USBDevIntClr = EP_SLOW;
-            if (EP1_OUT_callback())
-                epComplete &= ~EP(EP1OUT);
-        }
-
-        if (LPC_USB->USBEpIntSt & EP(EP2IN)) {
-            selectEndpointClearInterrupt(EP2IN);
-            epComplete |= EP(EP2IN);
-            LPC_USB->USBDevIntClr = EP_SLOW;
-            if (EP2_IN_callback())
-                epComplete &= ~EP(EP2IN);
-        }
-
-        if (LPC_USB->USBEpIntSt & EP(EP2OUT)) {
-            selectEndpointClearInterrupt(EP2OUT);
-            epComplete |= EP(EP2OUT);
-            LPC_USB->USBDevIntClr = EP_SLOW;
-            if (EP2_OUT_callback())
-                epComplete &= ~EP(EP2OUT);
-        }
-
-        if (LPC_USB->USBEpIntSt & EP(EP3IN)) {
-            selectEndpointClearInterrupt(EP3IN);
-            epComplete |= EP(EP3IN);
-            LPC_USB->USBDevIntClr = EP_SLOW;
-            if (EP3_IN_callback())
-                epComplete &= ~EP(EP3IN);
-        }
-
-        if (LPC_USB->USBEpIntSt & EP(EP3OUT)) {
-            selectEndpointClearInterrupt(EP3OUT);
-            epComplete |= EP(EP3OUT);
-            LPC_USB->USBDevIntClr = EP_SLOW;
-            if (EP3_OUT_callback())
-                epComplete &= ~EP(EP3OUT);
-        }
+//
+//         // TODO: This should cover all endpoints, not just EP1,2,3:
+//         if (LPC_USB->USBEpIntSt & EP(EP1IN)) {
+//             selectEndpointClearInterrupt(EP1IN);
+//             epComplete |= EP(EP1IN);
+//             LPC_USB->USBDevIntClr = EP_SLOW;
+//             if (EP1_IN_callback())
+//                 epComplete &= ~EP(EP1IN);
+//         }
+//
+//         if (LPC_USB->USBEpIntSt & EP(EP1OUT)) {
+//             selectEndpointClearInterrupt(EP1OUT);
+//             epComplete |= EP(EP1OUT);
+//             LPC_USB->USBDevIntClr = EP_SLOW;
+//             if (EP1_OUT_callback())
+//                 epComplete &= ~EP(EP1OUT);
+//         }
+//
+//         if (LPC_USB->USBEpIntSt & EP(EP2IN)) {
+//             selectEndpointClearInterrupt(EP2IN);
+//             epComplete |= EP(EP2IN);
+//             LPC_USB->USBDevIntClr = EP_SLOW;
+//             if (EP2_IN_callback())
+//                 epComplete &= ~EP(EP2IN);
+//         }
+//
+//         if (LPC_USB->USBEpIntSt & EP(EP2OUT)) {
+//             selectEndpointClearInterrupt(EP2OUT);
+//             epComplete |= EP(EP2OUT);
+//             LPC_USB->USBDevIntClr = EP_SLOW;
+//             if (EP2_OUT_callback())
+//                 epComplete &= ~EP(EP2OUT);
+//         }
+//
+//         if (LPC_USB->USBEpIntSt & EP(EP3IN)) {
+//             selectEndpointClearInterrupt(EP3IN);
+//             epComplete |= EP(EP3IN);
+//             LPC_USB->USBDevIntClr = EP_SLOW;
+//             if (EP3_IN_callback())
+//                 epComplete &= ~EP(EP3IN);
+//         }
+//
+//         if (LPC_USB->USBEpIntSt & EP(EP3OUT)) {
+//             selectEndpointClearInterrupt(EP3OUT);
+//             epComplete |= EP(EP3OUT);
+//             LPC_USB->USBDevIntClr = EP_SLOW;
+//             if (EP3_OUT_callback())
+//                 epComplete &= ~EP(EP3OUT);
+//         }
+//
+//         if (LPC_USB->USBEpIntSt & EP(EP5IN)) {
+//             selectEndpointClearInterrupt(EP5IN);
+//             epComplete |= EP(EP5IN);
+//             LPC_USB->USBDevIntClr = EP_SLOW;
+//             if (EP5_IN_callback())
+//                 epComplete &= ~EP(EP5IN);
+//         }
+//
+//         if (LPC_USB->USBEpIntSt & EP(EP5OUT)) {
+//             selectEndpointClearInterrupt(EP5OUT);
+//             epComplete |= EP(EP5OUT);
+//             LPC_USB->USBDevIntClr = EP_SLOW;
+//             if (EP5_OUT_callback())
+//                 epComplete &= ~EP(EP5OUT);
+//         }
     }
 }
 
