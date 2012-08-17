@@ -19,13 +19,16 @@
 #ifndef USBAudio_H
 #define USBAudio_H
 
+#include <stdint.h>
+
+#include "../../../../gcc4mbed/external/mbed/FunctionPointer.h"
+
 /* These headers are included for child class. */
 #include "USBEndpoints.h"
 #include "USBDescriptor.h"
 #include "USBDevice_Types.h"
 
 #include "USBDevice.h"
-
 
 /**
 * USBAudio example
@@ -49,7 +52,7 @@
 *
 * int main() {
 *    int16_t buf[AUDIO_LENGTH_PACKET/2];
-*    
+*
 *    while (1) {
 *        // read an audio packet
 *        audio.read((uint8_t *)buf);
@@ -65,7 +68,7 @@
 * }
 * @endcode
 */
-class USBAudio: public USBDevice {
+class USBAudio : public USB_EP_Receiver, public USB_Class_Receiver, public USB_Frame_Receiver {
 public:
 
     /**
@@ -79,7 +82,7 @@ public:
     * @param product_id Your product_id
     * @param product_release Your preoduct_release
     */
-    USBAudio(uint32_t frequency_in = 48000, uint8_t channel_nb_in = 1, uint32_t frequency_out = 8000, uint8_t channel_nb_out = 1, uint16_t vendor_id = 0x7bb8, uint16_t product_id = 0x1111, uint16_t product_release = 0x0100);
+    USBAudio(USB *, uint32_t frequency_in = 48000, uint8_t channel_nb_in = 1, uint32_t frequency_out = 8000, uint8_t channel_nb_out = 1);
 
     /**
     * Get current volume between 0.0 and 1.0
@@ -87,7 +90,7 @@ public:
     * @returns volume
     */
     float getVolume();
-    
+
     /**
     * Read an audio packet. During a frame, only a single reading (you can't write and read an audio packet during the same frame)can be done using this method. Warning: Blocking
     *
@@ -96,7 +99,7 @@ public:
     * @returns true if successfull
     */
     bool read(uint8_t * buf);
-    
+
     /**
     * Try to read an audio packet. During a frame, only a single reading (you can't write and read an audio packet during the same frame)can be done using this method. Warning: Non Blocking
     *
@@ -105,7 +108,7 @@ public:
     * @returns true if successfull
     */
     bool readNB(uint8_t * buf);
-    
+
     /**
     * Write an audio packet. During a frame, only a single writing (you can't write and read an audio packet during the same frame)can be done using this method.
     *
@@ -113,7 +116,7 @@ public:
     * @returns true if successful
     */
     bool write(uint8_t * buf);
-    
+
     /**
     * Write and read an audio packet at the same time (on the same frame)
     *
@@ -122,7 +125,7 @@ public:
     * @returns true if successful
     */
     bool readWrite(uint8_t * buf_read, uint8_t * buf_write);
-    
+
 
     /** attach a handler to update the volume
      *
@@ -163,7 +166,7 @@ protected:
     *
     * @returns true if class handles this request
     */
-    virtual bool USBCallback_request();
+    virtual bool USBCallback_request(CONTROL_TRANSFER *);
 
     /*
     * Get string product descriptor
@@ -211,12 +214,12 @@ protected:
     * Callback called on each Start of Frame event
     */
     virtual void SOF(int frameNumber);
-    
+
     /*
     * Callback called when a packet is received
     */
     virtual bool EP3_OUT_callback();
-    
+
     /*
     * Callback called when a packet has been sent
     */
@@ -224,15 +227,18 @@ protected:
 
 private:
 
+    // our parent USB composite device manager
+    USB *u;
+
     // stream available ?
     volatile bool available;
-    
+
     // interrupt OUT has been received
     volatile bool interruptOUT;
-    
+
     // interrupt IN has been received
     volatile bool interruptIN;
-    
+
     // audio packet has been written
     volatile bool writeIN;
 
@@ -247,7 +253,7 @@ private:
     // mono, stereo,...
     uint8_t channel_nb_in;
     uint8_t channel_nb_out;
-    
+
     // channel config: master, left, right
     uint8_t channel_config_in;
     uint8_t channel_config_out;
@@ -269,16 +275,16 @@ private:
 
     // Buffer containing one audio packet (to be read)
     volatile uint8_t * buf_stream_in;
-    
+
     // Buffer containing one audio packet (to be written)
     volatile uint8_t * buf_stream_out;
-    
+
     // callback to update volume
-    FunctionPointer updateVol;
-    
+    mbed::FunctionPointer updateVol;
+
     // boolean showing that the SOF handler has been called. Useful for readNB.
     volatile bool SOF_handler;
-    
+
     volatile float volume;
 
 };

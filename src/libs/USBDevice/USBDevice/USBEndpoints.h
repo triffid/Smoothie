@@ -19,6 +19,8 @@
 #ifndef USBENDPOINTS_H
 #define USBENDPOINTS_H
 
+#include "USBDevice_Types.h"
+
 /* SETUP packet size */
 #define SETUP_PACKET_SIZE (8)
 
@@ -36,13 +38,33 @@ typedef enum {
     EP_STALLED,     /* Endpoint stalled */
 } EP_STATUS;
 
+class USB_Frame_Receiver {
+public:
+    virtual bool FrameCallback(uint16_t) = 0;
+};
+
+class USB_EP_Receiver {
+public:
+    virtual bool EpCallback(uint8_t bEP, uint8_t bEPStatus) = 0;
+};
+
+class USB_Class_Receiver {
+public:
+    virtual bool USBCallback_request(CONTROL_TRANSFER *) = 0;
+};
+
+class USB_Setup_Receiver {
+public:
+    virtual bool USB_Setup_Callback(CONTROL_TRANSFER *) = 0;
+};
+
 /* Include configuration for specific target */
 #if defined(TARGET_LPC1768) || defined(TARGET_LPC2368)
-#include "USBEndpoints_LPC17_LPC23.h"
+    #include "USBEndpoints_LPC17_LPC23.h"
 #elif defined(TARGET_LPC11U24)
-#include "USBEndpoints_LPC11U.h"
+    #include "USBEndpoints_LPC11U.h"
 #else
-#error "Unknown target type"
+    #error "Unknown target type"
 #endif
 
 #endif

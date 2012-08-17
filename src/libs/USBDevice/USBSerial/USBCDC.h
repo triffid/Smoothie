@@ -19,14 +19,16 @@
 #ifndef USBCDC_H
 #define USBCDC_H
 
+#include "USB.h"
+
 /* These headers are included for child class. */
 #include "USBEndpoints.h"
 #include "USBDescriptor.h"
 #include "USBDevice_Types.h"
 
-#include "USBDevice.h"
+#include "descriptor_cdc.h"
 
-class USBCDC: public USBDevice {
+class USBCDC: public USB_EP_Receiver, public USB_Class_Receiver, USB_Setup_Receiver {
 public:
 
     /*
@@ -36,7 +38,7 @@ public:
     * @param product_id Your product_id
     * @param product_release Your preoduct_release
     */
-    USBCDC(uint16_t vendor_id, uint16_t product_id, uint16_t product_release);
+    USBCDC(USB *);
 
 protected:
 
@@ -45,28 +47,28 @@ protected:
     *
     * @returns pointer to the device descriptor
     */
-    virtual uint8_t * deviceDesc();
+//     virtual uint8_t * deviceDesc();
 
     /*
     * Get string product descriptor
     *
     * @returns pointer to the string product descriptor
     */
-    virtual uint8_t * stringIproductDesc();
+//     virtual uint8_t * stringIproductDesc();
 
     /*
     * Get string interface descriptor
     *
     * @returns pointer to the string interface descriptor
     */
-    virtual uint8_t * stringIinterfaceDesc();
+//     virtual uint8_t * stringIinterfaceDesc();
 
     /*
     * Get configuration descriptor
     *
     * @returns pointer to the configuration descriptor
     */
-    virtual uint8_t * configurationDesc();
+//     virtual uint8_t * configurationDesc();
 
     /*
     * Send a buffer
@@ -100,9 +102,26 @@ protected:
     */
     bool readEP_NB(uint8_t * buffer, uint32_t * size);
 
-    virtual bool USBCallback_request();
-    virtual bool USBCallback_setConfiguration(uint8_t configuration);
+    virtual bool USBCallback_request(CONTROL_TRANSFER *);
+//     virtual bool USBCallback_setConfiguration(uint8_t configuration);
 
+    virtual bool EpCallback(uint8_t, uint8_t);
+    virtual bool USB_Setup_Callback(CONTROL_TRANSFER *);
+
+    USB *usb;
+
+    // USB Descriptors
+    usbdesc_interface   CDC_if;
+    usbcdc_header       CDC_header;
+    usbcdc_callmgmt     CDC_callmgmt;
+    usbcdc_acm          CDC_acm;
+    usbcdc_union        CDC_union;
+
+    usbdesc_interface   CDC_slaveif;
+
+    usbdesc_endpoint    CDC_intep;
+    usbdesc_endpoint    CDC_BulkIn;
+    usbdesc_endpoint    CDC_BulkOut;
 };
 
 #endif

@@ -16,8 +16,13 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#include "stdint.h"
+#include <stdint.h>
+#include <stdlib.h>
+#include <cstring>
+
 #include "USBMSD.h"
+
+#include "descriptor_msc.h"
 
 #define DISK_OK         0x00
 #define NO_INIT         0x01
@@ -63,16 +68,67 @@ enum Status {
 };
 
 
-USBMSD::USBMSD(uint16_t vendor_id, uint16_t product_id, uint16_t product_release): USBDevice(vendor_id, product_id, product_release) {
+USBMSD::USBMSD(USB *u, MSD_Disk *d) {
+    this->usb = u;
+    this->disk = d;
+
+    MSC_Interface = {
+        DL_INTERFACE,           // bLength
+        DT_INTERFACE,           // bDescType
+        0,                      // bInterfaceNumber - filled out by USB during attach()
+        0,                      // bAlternateSetting
+        2,                      // bNumEndpoints
+        UC_MASS_STORAGE,        // bInterfaceClass
+        MSC_SUBCLASS_SCSI,      // bInterfaceSubClass
+        MSC_PROTOCOL_BULK_ONLY, // bInterfaceProtocol
+        0,                      // iInterface
+        0, 0, 0,                // dummy padding
+        this,                   // callback
+    };
+
+    MSC_BulkIn = {
+        DL_ENDPOINT,            // bLength
+        DT_ENDPOINT,            // bDescType
+        EP_DIR_IN,              // bEndpointAddress - we provide direction, index is filled out by USB during attach()
+        EA_BULK,                // bmAttributes
+        MAX_PACKET_SIZE_EPBULK, // wMaxPacketSize
+        0,                      // bInterval
+        0,                      // dummy padding
+        this,                   // endpoint callback
+        this,                   // setup callback
+    };
+    MSC_BulkOut = {
+        DL_ENDPOINT,            // bLength
+        DT_ENDPOINT,            // bDescType
+        EP_DIR_OUT,             // bEndpointAddress - we provide direction, index is filled out by USB during attach()
+        EA_BULK,                // bmAttributes
+        MAX_PACKET_SIZE_EPBULK, // wMaxPacketSize
+        0,                      // bInterval
+        0,                      // dummy padding
+        this,                   // endpoint callback
+        this,                   // setup callback
+    };
+
+    MSC_Description.bLength =   26;
+    MSC_Description.bDescType = DT_STRING;
+    MSC_Description.str =       { 'S','m','o','o','t','h','i','e',' ','M','S','D' };
+
+    usb->addInterface(&MSC_Interface);
+
+    usb->addEndpoint(&MSC_BulkIn);
+    usb->addEndpoint(&MSC_BulkOut);
+
+    MSC_Interface.iInterface =
+        usb->addString(&MSC_Description);
 }
 
 
 
 // Called in ISR context to process a class specific request
-bool USBMSD::USBCallback_request(void) {
+bool USBMSD::USBCallback_request(CONTROL_TRANSFER *transfer) {
 
     bool success = false;
-    CONTROL_TRANSFER * transfer = getTransferPtr();
+//     CONTROL_TRANSFER * transfer = getTransferPtr();
     static uint8_t maxLUN[1] = {0};
 
     if (transfer->setup.bmRequestType.Type == CLASS_TYPE) {
@@ -123,7 +179,7 @@ bool USBMSD::connect() {
     }
 
     //connect the device
-    USBDevice::connect();
+//     usb->connect();
     return true;
 }
 
@@ -136,12 +192,12 @@ void USBMSD::reset() {
 // Called in ISR context called when a data is received
 bool USBMSD::EP2_OUT_callback() {
     uint32_t size = 0;
-    uint8_t buf[MAX_PACKET_SIZE_EPBULK];
-    readEP(EPBULK_OUT, buf, &size, MAX_PACKET_SIZE_EPBULK);
+//     uint8_t buf[MAX_PACKET_SIZE_EPBULK];
+    usb->readEP(MSC_BulkOut.bEndpointAddress, buffer, &size, MAX_PACKET_SIZE_EPBULK);
     switch (stage) {
             // the device has to decode the CBW received
         case READ_CBW:
-            CBWDecode(buf, size);
+            CBWDecode(buffer, size);
             break;
 
             // the device has to receive data from the host
@@ -149,32 +205,35 @@ bool USBMSD::EP2_OUT_callback() {
             switch (cbw.CB[0]) {
                 case WRITE10:
                 case WRITE12:
-                    memoryWrite(buf, size);
+                    memoryWrite(buffer, size);
                     break;
                 case VERIFY10:
-                    memoryVerify(buf, size);
+                    memoryVerify(buffer, size);
                     break;
             }
             break;
 
             // an error has occured: stall endpoint and send CSW
         default:
-            stallEndpoint(EPBULK_OUT);
+            usb->stallEndpoint(MSC_BulkOut.bEndpointAddress);
             csw.Status = CSW_ERROR;
             sendCSW();
             break;
     }
 
     //reactivate readings on the OUT bulk endpoint
-    readStart(EPBULK_OUT, MAX_PACKET_SIZE_EPBULK);
+    usb->readStart(MSC_BulkOut.bEndpointAddress, MAX_PACKET_SIZE_EPBULK);
     return true;
 }
 
 // Called in ISR context when a data has been transferred
 bool USBMSD::EP2_IN_callback() {
     switch (stage) {
+        // not sure
+        case READ_CBW:
+            break;
 
-            // the device has to send data to the host
+        // the device has to send data to the host
         case PROCESS_CBW:
             switch (cbw.CB[0]) {
                 case READ10:
@@ -184,18 +243,18 @@ bool USBMSD::EP2_IN_callback() {
             }
             break;
 
-            //the device has to send a CSW
+        //the device has to send a CSW
         case SEND_CSW:
             sendCSW();
             break;
 
-            // an error has occured
+        // an error has occured
         case ERROR:
-            stallEndpoint(EPBULK_IN);
+            usb->stallEndpoint(MSC_BulkIn.bEndpointAddress);
             sendCSW();
             break;
 
-            // the host has received the CSW -> we wait a CBW
+        // the host has received the CSW -> we wait a CBW
         case WAIT_CSW:
             stage = READ_CBW;
             break;
@@ -209,7 +268,7 @@ void USBMSD::memoryWrite (uint8_t * buf, uint16_t size) {
     if ((addr + size) > MemorySize) {
         size = MemorySize - addr;
         stage = ERROR;
-        stallEndpoint(EPBULK_OUT);
+        usb->stallEndpoint(MSC_BulkOut.bEndpointAddress);
     }
 
     // we fill an array in RAM of 1 block before writing it in memory
@@ -239,7 +298,7 @@ void USBMSD::memoryVerify (uint8_t * buf, uint16_t size) {
     if ((addr + size) > MemorySize) {
         size = MemorySize - addr;
         stage = ERROR;
-        stallEndpoint(EPBULK_OUT);
+        usb->stallEndpoint(MSC_BulkOut.bEndpointAddress);
     }
 
     // beginning of a new block -> load a whole block in RAM
@@ -281,15 +340,15 @@ bool USBMSD::inquiryRequest (void) {
 
 bool USBMSD::readFormatCapacity() {
     uint8_t capacity[] = { 0x00, 0x00, 0x00, 0x08,
-                           (BlockCount >> 24) & 0xff,
-                           (BlockCount >> 16) & 0xff,
-                           (BlockCount >> 8) & 0xff,
-                           (BlockCount >> 0) & 0xff,
+                           (uint8_t) ((BlockCount >> 24) & 0xff),
+                           (uint8_t) ((BlockCount >> 16) & 0xff),
+                           (uint8_t) ((BlockCount >>  8) & 0xff),
+                           (uint8_t) ((BlockCount >>  0) & 0xff),
 
                            0x02,
-                           (BlockSize >> 16) & 0xff,
-                           (BlockSize >> 8) & 0xff,
-                           (BlockSize >> 0) & 0xff,
+                           (uint8_t) ((BlockSize >> 16) & 0xff),
+                           (uint8_t) ((BlockSize >>  8) & 0xff),
+                           (uint8_t) ((BlockSize >>  0) & 0xff),
                          };
     if (!write(capacity, sizeof(capacity))) {
         return false;
@@ -300,15 +359,15 @@ bool USBMSD::readFormatCapacity() {
 
 bool USBMSD::readCapacity (void) {
     uint8_t capacity[] = {
-        ((BlockCount - 1) >> 24) & 0xff,
-        ((BlockCount - 1) >> 16) & 0xff,
-        ((BlockCount - 1) >> 8) & 0xff,
-        ((BlockCount - 1) >> 0) & 0xff,
+        (uint8_t) (((BlockCount - 1) >> 24) & 0xff),
+        (uint8_t) (((BlockCount - 1) >> 16) & 0xff),
+        (uint8_t) (((BlockCount - 1) >> 8) & 0xff),
+        (uint8_t) (((BlockCount - 1) >> 0) & 0xff),
 
-        (BlockSize >> 24) & 0xff,
-        (BlockSize >> 16) & 0xff,
-        (BlockSize >> 8) & 0xff,
-        (BlockSize >> 0) & 0xff,
+        (uint8_t) ((BlockSize >> 24) & 0xff),
+        (uint8_t) ((BlockSize >> 16) & 0xff),
+        (uint8_t) ((BlockSize >> 8) & 0xff),
+        (uint8_t) ((BlockSize >> 0) & 0xff),
     };
     if (!write(capacity, sizeof(capacity))) {
         return false;
@@ -323,7 +382,7 @@ bool USBMSD::write (uint8_t * buf, uint16_t size) {
     }
     stage = SEND_CSW;
 
-    if (!writeNB(EPBULK_IN, buf, size, MAX_PACKET_SIZE_EPBULK)) {
+    if (!usb->writeNB(MSC_BulkIn.bEndpointAddress, buf, size, MAX_PACKET_SIZE_EPBULK)) {
         return false;
     }
 
@@ -343,7 +402,7 @@ bool USBMSD::modeSense6 (void) {
 
 void USBMSD::sendCSW() {
     csw.Signature = CSW_Signature;
-    writeNB(EPBULK_IN, (uint8_t *)&csw, sizeof(CSW), MAX_PACKET_SIZE_EPBULK);
+    usb->writeNB(MSC_BulkIn.bEndpointAddress, (uint8_t *)&csw, sizeof(CSW), MAX_PACKET_SIZE_EPBULK);
     stage = WAIT_CSW;
 }
 
@@ -417,7 +476,7 @@ void USBMSD::CBWDecode(uint8_t * buf, uint16_t size) {
                                 stage = PROCESS_CBW;
                                 memoryRead();
                             } else {
-                                stallEndpoint(EPBULK_OUT);
+                                usb->stallEndpoint(MSC_BulkOut.bEndpointAddress);
                                 csw.Status = CSW_ERROR;
                                 sendCSW();
                             }
@@ -429,7 +488,7 @@ void USBMSD::CBWDecode(uint8_t * buf, uint16_t size) {
                             if (!(cbw.Flags & 0x80)) {
                                 stage = PROCESS_CBW;
                             } else {
-                                stallEndpoint(EPBULK_IN);
+                                usb->stallEndpoint(MSC_BulkIn.bEndpointAddress);
                                 csw.Status = CSW_ERROR;
                                 sendCSW();
                             }
@@ -446,7 +505,7 @@ void USBMSD::CBWDecode(uint8_t * buf, uint16_t size) {
                                 stage = PROCESS_CBW;
                                 memOK = true;
                             } else {
-                                stallEndpoint(EPBULK_IN);
+                                usb->stallEndpoint(MSC_BulkIn.bEndpointAddress);
                                 csw.Status = CSW_ERROR;
                                 sendCSW();
                             }
@@ -465,9 +524,9 @@ void USBMSD::testUnitReady (void) {
 
     if (cbw.DataLength != 0) {
         if ((cbw.Flags & 0x80) != 0) {
-            stallEndpoint(EPBULK_IN);
+            usb->stallEndpoint(MSC_BulkIn.bEndpointAddress);
         } else {
-            stallEndpoint(EPBULK_OUT);
+            usb->stallEndpoint(MSC_BulkOut.bEndpointAddress);
         }
     }
 
@@ -491,7 +550,7 @@ void USBMSD::memoryRead (void) {
         disk_read((char *)page, addr/BlockSize);
 
     // write data which are in RAM
-    writeNB(EPBULK_IN, &page[addr%BlockSize], n, MAX_PACKET_SIZE_EPBULK);
+    usb->writeNB(MSC_BulkIn.bEndpointAddress, &page[addr%BlockSize], n, MAX_PACKET_SIZE_EPBULK);
 
     addr += n;
     length -= n;
@@ -537,9 +596,9 @@ bool USBMSD::infoTransfer (void) {
 
     if (cbw.DataLength != length) {
         if ((cbw.Flags & 0x80) != 0) {
-            stallEndpoint(EPBULK_IN);
+            usb->stallEndpoint(MSC_BulkIn.bEndpointAddress);
         } else {
-            stallEndpoint(EPBULK_OUT);
+            usb->stallEndpoint(MSC_BulkOut.bEndpointAddress);
         }
 
         csw.Status = CSW_FAILED;
@@ -562,77 +621,73 @@ bool USBMSD::USBCallback_setConfiguration(uint8_t configuration) {
         return false;
     }
 
-    // Configure endpoints > 0
-    addEndpoint(EPBULK_IN, MAX_PACKET_SIZE_EPBULK);
-    addEndpoint(EPBULK_OUT, MAX_PACKET_SIZE_EPBULK);
-
     //activate readings
-    readStart(EPBULK_OUT, MAX_PACKET_SIZE_EPBULK);
+    usb->readStart(MSC_BulkOut.bEndpointAddress, MAX_PACKET_SIZE_EPBULK);
     return true;
 }
 
 
-uint8_t * USBMSD::stringIinterfaceDesc() {
-    static uint8_t stringIinterfaceDescriptor[] = {
-        0x08,                           //bLength
-        STRING_DESCRIPTOR,              //bDescriptorType 0x03
-        'M',0,'S',0,'D',0               //bString iInterface - MSD
-    };
-    return stringIinterfaceDescriptor;
-}
-
-uint8_t * USBMSD::stringIproductDesc() {
-    static uint8_t stringIproductDescriptor[] = {
-        0x12,                                           //bLength
-        STRING_DESCRIPTOR,                              //bDescriptorType 0x03
-        'M',0,'b',0,'e',0,'d',0,' ',0,'M',0,'S',0,'D',0 //bString iProduct - Mbed Audio
-    };
-    return stringIproductDescriptor;
-}
+// uint8_t * USBMSD::stringIinterfaceDesc() {
+//     static uint8_t stringIinterfaceDescriptor[] = {
+//         0x08,                           //bLength
+//         STRING_DESCRIPTOR,              //bDescriptorType 0x03
+//         'M',0,'S',0,'D',0               //bString iInterface - MSD
+//     };
+//     return stringIinterfaceDescriptor;
+// }
+//
+// uint8_t * USBMSD::stringIproductDesc() {
+//     static uint8_t stringIproductDescriptor[] = {
+//         0x12,                                           //bLength
+//         STRING_DESCRIPTOR,                              //bDescriptorType 0x03
+//         'M',0,'b',0,'e',0,'d',0,' ',0,'M',0,'S',0,'D',0 //bString iProduct - Mbed Audio
+//     };
+//     return stringIproductDescriptor;
+// }
 
 
 uint8_t * USBMSD::configurationDesc() {
-    static uint8_t configDescriptor[] = {
-
-        // Configuration 1
-        9,      // bLength
-        2,      // bDescriptorType
-        LSB(9 + 9 + 7 + 7), // wTotalLength
-        MSB(9 + 9 + 7 + 7),
-        0x01,   // bNumInterfaces
-        0x01,   // bConfigurationValue: 0x01 is used to select this configuration
-        0x00,   // iConfiguration: no string to describe this configuration
-        0xC0,   // bmAttributes
-        100,    // bMaxPower, device power consumption is 100 mA
-
-        // Interface 0, Alternate Setting 0, MSC Class
-        9,      // bLength
-        4,      // bDescriptorType
-        0x00,   // bInterfaceNumber
-        0x00,   // bAlternateSetting
-        0x02,   // bNumEndpoints
-        0x08,   // bInterfaceClass
-        0x06,   // bInterfaceSubClass
-        0x50,   // bInterfaceProtocol
-        0x04,   // iInterface
-
-        // endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
-        7,                          // bLength
-        5,                          // bDescriptorType
-        PHY_TO_DESC(EPBULK_IN),     // bEndpointAddress
-        0x02,                       // bmAttributes (0x02=bulk)
-        LSB(MAX_PACKET_SIZE_EPBULK),// wMaxPacketSize (LSB)
-        MSB(MAX_PACKET_SIZE_EPBULK),// wMaxPacketSize (MSB)
-        0,                          // bInterval
-
-        // endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
-        7,                          // bLength
-        5,                          // bDescriptorType
-        PHY_TO_DESC(EPBULK_OUT),    // bEndpointAddress
-        0x02,                       // bmAttributes (0x02=bulk)
-        LSB(MAX_PACKET_SIZE_EPBULK),// wMaxPacketSize (LSB)
-        MSB(MAX_PACKET_SIZE_EPBULK),// wMaxPacketSize (MSB)
-        0                           // bInterval
-    };
-    return configDescriptor;
+//     static uint8_t configDescriptor[] = {
+//
+//         // Configuration 1
+//         9,      // bLength
+//         2,      // bDescriptorType
+//         LSB(9 + 9 + 7 + 7), // wTotalLength
+//         MSB(9 + 9 + 7 + 7),
+//         0x01,   // bNumInterfaces
+//         0x01,   // bConfigurationValue: 0x01 is used to select this configuration
+//         0x00,   // iConfiguration: no string to describe this configuration
+//         0xC0,   // bmAttributes
+//         100,    // bMaxPower, device power consumption is 100 mA
+//
+//         // Interface 0, Alternate Setting 0, MSC Class
+//         9,      // bLength
+//         4,      // bDescriptorType
+//         0x00,   // bInterfaceNumber
+//         0x00,   // bAlternateSetting
+//         0x02,   // bNumEndpoints
+//         0x08,   // bInterfaceClass
+//         0x06,   // bInterfaceSubClass
+//         0x50,   // bInterfaceProtocol
+//         0x04,   // iInterface
+//
+//         // endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
+//         7,                          // bLength
+//         5,                          // bDescriptorType
+//         PHY_TO_DESC(EPBULK_IN),     // bEndpointAddress
+//         0x02,                       // bmAttributes (0x02=bulk)
+//         LSB(MAX_PACKET_SIZE_EPBULK),// wMaxPacketSize (LSB)
+//         MSB(MAX_PACKET_SIZE_EPBULK),// wMaxPacketSize (MSB)
+//         0,                          // bInterval
+//
+//         // endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
+//         7,                          // bLength
+//         5,                          // bDescriptorType
+//         PHY_TO_DESC(EPBULK_OUT),    // bEndpointAddress
+//         0x02,                       // bmAttributes (0x02=bulk)
+//         LSB(MAX_PACKET_SIZE_EPBULK),// wMaxPacketSize (LSB)
+//         MSB(MAX_PACKET_SIZE_EPBULK),// wMaxPacketSize (MSB)
+//         0                           // bInterval
+//     };
+//     return configDescriptor;
 }

@@ -1,8 +1,8 @@
-/*  
+/*
       This file is part of Smoothie (http://smoothieware.org/). The motion control part is heavily based on Grbl (https://github.com/simen/grbl).
       Smoothie is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
       Smoothie is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-      You should have received a copy of the GNU General Public License along with Smoothie. If not, see <http://www.gnu.org/licenses/>. 
+      You should have received a copy of the GNU General Public License along with Smoothie. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "libs/Kernel.h"
@@ -19,12 +19,26 @@
 #include "libs/nuts_bolts.h"
 #include "libs/utils.h"
 
-#include "libs/USBCDCMSC/USBCDCMSC.h"
+// #include "libs/USBCDCMSC/USBCDCMSC.h"
 SDFileSystem sd(p5, p6, p7, p8, "sd");  // LPC17xx specific : comment if you are not using a SD card ( for example with a mBed ).
 //LocalFileSystem local("local");       // LPC17xx specific : comment if you are not running a mBed
-USBCDCMSC cdcmsc(&sd);                  // LPC17xx specific : Composite serial + msc USB device
+// USBCDCMSC cdcmsc(&sd);                  // LPC17xx specific : Composite serial + msc USB device
+
+#include "libs/USBDevice/USB.h"
+#include "libs/USBDevice/USBSerial/USBSerial.h"
+
+#define SMOOTHIE_USB_VENDOR         0x1d50
+#define SMOOTHIE_USB_PRODUCT        0x6015
+#define SMOOTHIE_FIRMWARE_REVISION  0x0001
+
+USB usb(SMOOTHIE_USB_VENDOR, SMOOTHIE_USB_PRODUCT, SMOOTHIE_FIRMWARE_REVISION);
+
+USBSerial usb_serial(&usb);
+USBMSC usb_msc(&usb, &SDFileSystem);
+USBECM usb_ethernet(&usb);
 
 int main() {
+    usb.connect();
 
     Kernel* kernel = new Kernel();
 
@@ -36,10 +50,10 @@ int main() {
     kernel->add_module( new Configurator() );
     kernel->add_module( new CurrentControl() );
     kernel->add_module( new TemperatureControlPool() );
-    kernel->add_module( new PauseButton() );   
+    kernel->add_module( new PauseButton() );
 
-    kernel->add_module( &cdcmsc );
-   
+    kernel->add_module( &usb_serial );
+
     kernel->serial->printf("start\r\n");
 
     while(1){

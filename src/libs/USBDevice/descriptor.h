@@ -116,7 +116,9 @@ typedef struct __attribute__ ((packed)) {
 	uint8_t		bInterfaceSubClass;		// Subclass Code
 	uint8_t		bInterfaceProtocol;		// Protocol Code
 	uint8_t		iInterface;				// Index of String Descriptor Describing this interface
-	uint8_t		dummy[3];				// pad to 32 bit boundary
+	uint8_t		dummy0;     			// pad to 32 bit boundary
+	uint8_t     dummy1;                 // pad to 32 bit boundary
+	uint8_t     dummy2;                 // pad to 32 bit boundary
 	USB_Setup_Receiver *setupReceiver; // who do we call when we receive a setup packet for this interface?
 } usbdesc_interface;
 

@@ -20,12 +20,61 @@
 #ifndef USBMSD_H
 #define USBMSD_H
 
+#include "USB.h"
+
 /* These headers are included for child class. */
 #include "USBEndpoints.h"
 #include "USBDescriptor.h"
 #include "USBDevice_Types.h"
 
 #include "USBDevice.h"
+
+class MSD_Disk {
+    /*
+     * read a block on a storage chip
+     *
+     * @param data pointer where will be stored read data
+     * @param block block number
+     * @returns 0 if successful
+     */
+    virtual int disk_read(char * data, int block) = 0;
+
+    /*
+     * write a block on a storage chip
+     *
+     * @param data data to write
+     * @param block block number
+     * @returns 0 if successful
+     */
+    virtual int disk_write(const char * data, int block) = 0;
+
+    /*
+     * Disk initilization
+     */
+    virtual int disk_initialize() = 0;
+
+    /*
+     * Return the number of blocks
+     *
+     * @returns number of blocks
+     */
+    virtual int disk_sectors() = 0;
+
+    /*
+     * Return memory size
+     *
+     * @returns memory size
+     */
+    virtual int disk_size() = 0;
+
+
+    /*
+     * To check the status of the storage chip
+     *
+     * @returns status: 0: OK, 1: disk not initialized, 2: no medium in the drive, 4: write protected
+     */
+    virtual int disk_status() = 0;
+};
 
 /**
  * USBMSD class: generic class in order to use all kinds of blocks storage chip
@@ -55,7 +104,7 @@
  * If disk_status() returns 1 (disk not initialized), then disk_initialize() is called. After this step, connect() will collect information
  * such as the number of blocks and the memory size.
  */
-class USBMSD: public USBDevice {
+class USBMSD: public USB_EP_Receiver, public USB_Setup_Receiver {
 public:
 
     /**
@@ -65,7 +114,7 @@ public:
     * @param product_id Your product_id
     * @param product_release Your preoduct_release
     */
-    USBMSD(uint16_t vendor_id = 0x0703, uint16_t product_id = 0x0104, uint16_t product_release = 0x0001);
+    USBMSD(USB *, MSD_Disk *);
 
     /**
     * Connect the USB MSD device. Establish disk initialization before really connect the device.
@@ -161,10 +210,15 @@ protected:
     /*
     * Callback called to process class specific requests
     */
-    virtual bool USBCallback_request();
+    virtual bool USBCallback_request(CONTROL_TRANSFER *);
 
 
 private:
+    // parent USB composite device manager
+    USB *usb;
+
+    // disk
+    MSD_Disk *disk;
 
     // MSC Bulk-only Stage
     enum Stage {
@@ -176,7 +230,7 @@ private:
     };
 
     // Bulk-only CBW
-    typedef __packed struct {
+    typedef struct {
         uint32_t Signature;
         uint32_t Tag;
         uint32_t DataLength;
@@ -187,7 +241,7 @@ private:
     } CBW;
 
     // Bulk-only CSW
-    typedef __packed struct {
+    typedef struct {
         uint32_t Signature;
         uint32_t Tag;
         uint32_t DataResidue;
@@ -215,6 +269,9 @@ private:
     // cache in RAM before writing in memory. Useful also to read a block.
     uint8_t * page;
 
+    // USB packet buffer
+    uint8_t buffer[MAX_PACKET_SIZE_EPBULK];
+
     int BlockSize;
     int MemorySize;
     int BlockCount;
@@ -234,6 +291,13 @@ private:
     void memoryWrite (uint8_t * buf, uint16_t size);
     void reset();
     void fail();
+
+    // USB descriptors
+    usbdesc_interface MSC_Interface;
+    usbdesc_endpoint  MSC_BulkOut;
+    usbdesc_endpoint  MSC_BulkIn;
+
+    usbdesc_string_l(12) MSC_Description;
 };
 
 #endif

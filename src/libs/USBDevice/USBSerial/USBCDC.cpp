@@ -29,15 +29,118 @@ static uint8_t cdc_line_coding[7]= {0x80, 0x25, 0x00, 0x00, 0x00, 0x00, 0x08};
 
 #define MAX_CDC_REPORT_SIZE MAX_PACKET_SIZE_EPBULK
 
-USBCDC::USBCDC(uint16_t vendor_id, uint16_t product_id, uint16_t product_release): USBDevice(vendor_id, product_id, product_release) {
-    USBDevice::connect();
+USBCDC::USBCDC(USB *u) {
+    usb = u;
+
+    CDC_if = {
+        DL_INTERFACE,           // bLength
+        DT_INTERFACE,           // bDescType
+        0,                      // bInterfaceNumber: filled out during addInterface()
+        0,                      // bAlternateSetting
+        1,                      // bNumEndpoints
+        UC_COMM,                // bInterfaceClass
+        USB_CDC_SUBCLASS_ACM,   // bInterfaceSubClass
+        1,                      // bInterfaceProtocol
+        0,                      // iInterface
+        0, 0, 0,                // dummy padding
+        this,                   // callback
+    };
+    CDC_intep = {
+        DL_ENDPOINT,            // bLength
+        DT_ENDPOINT,            // bDescType
+        EP_DIR_IN,              // bEndpointAddress: we provide direction, address is filled in by addEndpoint()
+        EA_INTERRUPT,           // bmAttributes
+        8,                      // wMaxPacketSize
+        16,                     // bInterval
+        0,                      // dummy padding
+        this,                   // endpoint callback
+        this,                   // setup callback
+    };
+    CDC_header = {
+        USB_CDC_LENGTH_HEADER,  // bLength
+        DT_CDC_DESCRIPTOR,      // bDescType
+        USB_CDC_SUBTYPE_HEADER, // bDescSubType
+        0x0110,                 // bcdCDC
+    };
+    CDC_callmgmt = {
+        USB_CDC_LENGTH_CALLMGMT,            // bLength
+        DT_CDC_DESCRIPTOR,                  // bDescType
+        USB_CDC_SUBTYPE_CALL_MANAGEMENT,    // bDescSubType
+        USB_CDC_CALLMGMT_CAP_CALLMGMT | USB_CDC_CALLMGMT_CAP_DATAINTF,  // bmCapabilities
+        0,                      // bDataInterface: filled in later
+    };
+    CDC_acm = {
+        USB_CDC_LENGTH_ACM,     // bLength
+        DT_CDC_DESCRIPTOR,      // bDescType
+        USB_CDC_SUBTYPE_ACM,    // bDescSubType
+        USB_CDC_ACM_CAP_LINE | USB_CDC_ACM_CAP_BRK, // bmCapabilities
+    };
+    CDC_union = {
+        USB_CDC_LENGTH_UNION,   // bLength
+        DT_CDC_DESCRIPTOR,      // bDescType
+        USB_CDC_SUBTYPE_UNION,  // bDescSubType
+        0,                      // bMasterInterface
+        0,                      // bSlaveInterface0
+    };
+    CDC_slaveif = {
+        DL_INTERFACE,           // bLength
+        DT_INTERFACE,           // bDescType
+        0,                      // bInterfaceNumber: filled out during addInterface()
+        0,                      // bAlternateSetting
+        2,                      // bNumEndpoints
+        UC_CDC_DATA,            // bInterfaceClass
+        0,                      // bInterfaceSubClass
+        0,                      // bInterfaceProtocol
+        0,                      // iInterface
+        0, 0, 0,                // dummy padding
+        this,                   // callback
+    };
+    CDC_BulkIn = {
+        DL_ENDPOINT,            // bLength
+        DT_ENDPOINT,            // bDescType
+        EP_DIR_IN,              // bEndpointAddress: we provide direction, address is filled in by addEndpoint()
+        EA_BULK,                // bmAttributes
+        MAX_PACKET_SIZE_EPBULK, // wMaxPacketSize
+        0,                      // bInterval
+        0,                      // dummy padding
+        this,                   // endpoint callback
+        this,                   // setup callback
+    };
+    CDC_BulkOut = {
+        DL_ENDPOINT,            // bLength
+        DT_ENDPOINT,            // bDescType
+        EP_DIR_OUT,             // bEndpointAddress: we provide direction, address is filled in by addEndpoint()
+        EA_BULK,                // bmAttributes
+        MAX_PACKET_SIZE_EPBULK, // wMaxPacketSize
+        0,                      // bInterval
+        0,                      // dummy padding
+        this,                   // endpoint callback
+        this,                   // setup callback
+    };
+
+    uint8_t IfAddr =
+        usb->addInterface(&CDC_if);
+    uint8_t EpIntAddr =
+        usb->addEndpoint(&CDC_intep);
+        usb->addDescriptor(&CDC_callmgmt);
+        usb->addDescriptor(&CDC_acm);
+        usb->addDescriptor(&CDC_union);
+    uint8_t slaveIfAddr =
+        usb->addInterface(&CDC_slaveif);
+    uint8_t EpInAddr =
+        usb->addEndpoint(&CDC_BulkIn);
+    uint8_t EpOutAddr =
+        usb->addEndpoint(&CDC_BulkOut);
+
+    CDC_union.bMasterInterface = IfAddr;
+    CDC_union.bSlaveInterface0 = slaveIfAddr;
 }
 
-bool USBCDC::USBCallback_request(void) {
+bool USBCDC::USBCallback_request(CONTROL_TRANSFER *transfer) {
     /* Called in ISR context */
 
     bool success = false;
-    CONTROL_TRANSFER * transfer = getTransferPtr();
+//     CONTROL_TRANSFER * transfer = getTransferPtr();
 
     /* Process class-specific requests */
 
@@ -64,46 +167,57 @@ bool USBCDC::USBCallback_request(void) {
     return success;
 }
 
+#define EPINT_IN    CDC_intep.bEndpointAddress
+#define EPBULK_IN   CDC_BulkIn.bEndpointAddress
+#define EPBULK_OUT  CDC_BulkOut.bEndpointAddress
 
 // Called in ISR context
 // Set configuration. Return false if the
 // configuration is not supported.
-bool USBCDC::USBCallback_setConfiguration(uint8_t configuration) {
-    if (configuration != DEFAULT_CONFIGURATION) {
-        return false;
-    }
-
-    // Configure endpoints > 0
-    addEndpoint(EPINT_IN, MAX_PACKET_SIZE_EPINT);
-    addEndpoint(EPBULK_IN, MAX_PACKET_SIZE_EPBULK);
-    addEndpoint(EPBULK_OUT, MAX_PACKET_SIZE_EPBULK);
-
-    // We activate the endpoint to be able to recceive data
-    readStart(EPBULK_OUT, MAX_PACKET_SIZE_EPBULK);
-    return true;
-}
+// bool USBCDC::USBCallback_setConfiguration(uint8_t configuration) {
+//     if (configuration != DEFAULT_CONFIGURATION) {
+//         return false;
+//     }
+//
+//     // Configure endpoints > 0
+// //     usb->addEndpoint(EPINT_IN, MAX_PACKET_SIZE_EPINT);
+// //     usb->addEndpoint(EPBULK_IN, MAX_PACKET_SIZE_EPBULK);
+// //     usb->addEndpoint(EPBULK_OUT, MAX_PACKET_SIZE_EPBULK);
+//
+//     // We activate the endpoint to be able to recceive data
+//     usb->readStart(EPBULK_OUT, MAX_PACKET_SIZE_EPBULK);
+//     return true;
+// }
 
 bool USBCDC::send(uint8_t * buffer, uint32_t size) {
-    return USBDevice::write(EPBULK_IN, buffer, size, MAX_CDC_REPORT_SIZE);
+    return usb->write(EPBULK_IN, buffer, size, MAX_CDC_REPORT_SIZE);
 }
 
 bool USBCDC::readEP(uint8_t * buffer, uint32_t * size) {
-    if (!USBDevice::readEP(EPBULK_OUT, buffer, size, MAX_CDC_REPORT_SIZE))
+    if (!usb->readEP(EPBULK_OUT, buffer, size, MAX_CDC_REPORT_SIZE))
         return false;
-    if (!readStart(EPBULK_OUT, MAX_CDC_REPORT_SIZE))
+    if (!usb->readStart(EPBULK_OUT, MAX_CDC_REPORT_SIZE))
         return false;
     return true;
 }
 
 bool USBCDC::readEP_NB(uint8_t * buffer, uint32_t * size) {
-    if (!USBDevice::readEP_NB(EPBULK_OUT, buffer, size, MAX_CDC_REPORT_SIZE))
+    if (!usb->readEP_NB(EPBULK_OUT, buffer, size, MAX_CDC_REPORT_SIZE))
         return false;
-    if (!readStart(EPBULK_OUT, MAX_CDC_REPORT_SIZE))
+    if (!usb->readStart(EPBULK_OUT, MAX_CDC_REPORT_SIZE))
         return false;
     return true;
 }
 
+bool USBCDC::EpCallback(uint8_t bEP, uint8_t bEPStatus) {
+    return false;
+}
 
+bool USBCDC::USB_Setup_Callback(CONTROL_TRANSFER *transfer) {
+    return false;
+}
+
+/*
 uint8_t * USBCDC::deviceDesc() {
     static uint8_t deviceDescriptor[] = {
         18,                   // bLength
@@ -236,4 +350,4 @@ uint8_t * USBCDC::configurationDesc() {
         0                       // bInterval
     };
     return configDescriptor;
-}
+}*/

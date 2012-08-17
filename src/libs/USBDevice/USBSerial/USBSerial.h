@@ -23,6 +23,7 @@
 #include "Stream.h"
 #include "CircBuffer.h"
 
+#include "../../../../gcc4mbed/external/mbed/FunctionPointer.h"
 
 /**
 * USBSerial example
@@ -44,7 +45,7 @@
 * }
 * @endcode
 */
-class USBSerial: public USBCDC, public Stream {
+class USBSerial: public USBCDC {
 public:
 
     /**
@@ -55,7 +56,7 @@ public:
     * @param product_release Your preoduct_release (default: 0x0001)
     *
     */
-    USBSerial(uint16_t vendor_id = 0x1f00, uint16_t product_id = 0x2012, uint16_t product_release = 0x0001): USBCDC(vendor_id, product_id, product_release), buf(128){ };
+    USBSerial(USB *u): USBCDC(u), buf(128){ };
 
 
     /**
@@ -118,10 +119,10 @@ public:
 
 
 protected:
-    virtual bool EP2_OUT_callback();
+    virtual bool EpCallback(uint8_t, uint8_t);
 
 private:
-    FunctionPointer rx;
+    mbed::FunctionPointer rx;
     CircBuffer<uint8_t> buf;
 };
 

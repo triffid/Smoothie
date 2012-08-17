@@ -16,6 +16,8 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+#ifdef USB_HID
+
 #include "stdint.h"
 #include "USBHAL.h"
 #include "USBHID.h"
@@ -118,7 +120,7 @@ bool USBHID::USBCallback_request() {
                                 success = true;
                             }
                             break;
-                     
+
                     default:
                         break;
                 }
@@ -271,3 +273,5 @@ uint8_t * USBHID::configurationDesc() {
     };
     return configurationDescriptor;
 }
+
+#endif /* USB_HID */

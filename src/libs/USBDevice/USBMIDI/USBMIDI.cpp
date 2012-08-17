@@ -16,6 +16,8 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+#ifdef USB_MIDI
+
 #include "stdint.h"
 #include "USBMIDI.h"
 
@@ -119,3 +121,5 @@ uint8_t * USBMIDI::configurationDesc() {
     };
     return configDescriptor;
 }
+
+#endif /* USB_MIDI */

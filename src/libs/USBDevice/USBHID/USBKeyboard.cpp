@@ -16,6 +16,8 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+#ifdef USB_KEYBOARD
+
 #include "stdint.h"
 
 #include "USBKeyboard.h"
@@ -183,7 +185,7 @@ const KEYMAP keymap[KEYMAP_SIZE] = {
     {0x4a, 0},          /* HOME */
     {0x4b, 0},          /* PAGE_UP */
     {0x4e, 0},          /* PAGE_DOWN */
-    
+
     {0x4f, 0},          /* RIGHT_ARROW */
     {0x50, 0},          /* LEFT_ARROW */
     {0x51, 0},          /* DOWN_ARROW */
@@ -344,7 +346,7 @@ const KEYMAP keymap[KEYMAP_SIZE] = {
     {0x4a, 0},          /* HOME */
     {0x4b, 0},          /* PAGE_UP */
     {0x4e, 0},          /* PAGE_DOWN */
-    
+
     {0x4f, 0},          /* RIGHT_ARROW */
     {0x50, 0},          /* LEFT_ARROW */
     {0x51, 0},          /* DOWN_ARROW */
@@ -424,10 +426,10 @@ bool USBKeyboard::EP1_OUT_callback() {
     uint32_t bytesRead = 0;
     uint8_t led[65];
     USBDevice::readEP(EPINT_OUT, led, &bytesRead, MAX_HID_REPORT_SIZE);
-    
+
     // we take led[1] because led[0] is the report ID
     lock_status = led[1] & 0x07;
-    
+
     // We activate the endpoint to be able to recceive data
     if (!readStart(EPINT_OUT, MAX_HID_REPORT_SIZE))
         return false;
@@ -551,3 +553,5 @@ uint8_t * USBKeyboard::configurationDesc() {
     };
     return configurationDescriptor;
 }
+
+#endif /* USB_KEYBOARD */

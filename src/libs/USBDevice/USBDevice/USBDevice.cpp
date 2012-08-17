@@ -60,6 +60,7 @@ bool USBDevice::assembleConfigDescriptor() {
     static uint8_t confRmn = 0;
 
     uint8_t confBufferPtr = 0;
+    transfer.ptr = confBuffer;
 
     // magic number to reset descriptor assembler
     if (transfer.remaining == 0xFFFFFFFF) {
@@ -70,8 +71,6 @@ bool USBDevice::assembleConfigDescriptor() {
                 if (conf->bConfigurationValue == transfer.setup.wIndex) {
                     // we're going to transmit wTotalLength to the host
                     transfer.remaining = conf->wTotalLength;
-                    // from this buffer
-                    transfer.ptr = confBuffer;
                     // start at index of this config descriptor
                     confIndex = i;
                     // reset counters

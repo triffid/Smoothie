@@ -44,22 +44,24 @@ bool USBSerial::writeBlock(uint8_t * buf, uint16_t size) {
 
 
 
-bool USBSerial::EP2_OUT_callback() {
-    uint8_t c[65];
-    uint32_t size = 0;
+bool USBSerial::EpCallback(uint8_t bEP, uint8_t bEPStatus) {
+    if (bEP == CDC_BulkOut.bEndpointAddress) {
+        uint8_t c[65];
+        uint32_t size = 0;
 
-    //we read the packet received and put it on the circular buffer
-    readEP(c, &size);
-    for (int i = 0; i < size; i++) {
-        buf.queue(c[i]);
+        //we read the packet received and put it on the circular buffer
+        readEP(c, &size);
+        for (int i = 0; i < size; i++) {
+            buf.queue(c[i]);
+        }
+
+        //call a potential handler
+        rx.call();
+
+        // We reactivate the endpoint to receive next characters
+        usb->readStart(CDC_BulkOut.bEndpointAddress, MAX_PACKET_SIZE_EPBULK);
+        return true;
     }
-
-    //call a potential handler
-    rx.call();
-
-    // We reactivate the endpoint to receive next characters
-    readStart(EPBULK_OUT, MAX_PACKET_SIZE_EPBULK);
-    return true;
 }
 
 uint8_t USBSerial::available() {

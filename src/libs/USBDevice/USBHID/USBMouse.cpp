@@ -16,6 +16,8 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+#ifdef USB_MOUSE
+
 #include "stdint.h"
 #include "USBMouse.h"
 
@@ -243,3 +245,5 @@ uint8_t * USBMouse::configurationDesc() {
     };
     return configurationDescriptor;
 }
+
+#endif /* USB_MOUSE */

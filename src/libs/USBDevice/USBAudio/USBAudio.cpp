@@ -16,19 +16,25 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#include "stdint.h"
+#ifdef USB_AUDIO
+
+#include "USB.h"
+
 #include "USBAudio.h"
 #include "USBAudio_Types.h"
 
 
 
-USBAudio::USBAudio(uint32_t frequency_in, uint8_t channel_nb_in, uint32_t frequency_out, uint8_t channel_nb_out, uint16_t vendor_id, uint16_t product_id, uint16_t product_release): USBDevice(vendor_id, product_id, product_release) {
+
+USBAudio::USBAudio(USB *u, uint32_t frequency_in, uint8_t channel_nb_in, uint32_t frequency_out, uint8_t channel_nb_out) {
     mute = 0;
     volCur = 0x0080;
     volMin = 0x0000;
     volMax = 0x0100;
     volRes = 0x0004;
     available = false;
+
+    this->u = u;
 
     FREQ_IN = frequency_in;
     FREQ_OUT = frequency_out;
@@ -57,7 +63,7 @@ USBAudio::USBAudio(uint32_t frequency_in, uint8_t channel_nb_in, uint32_t freque
     volume = 0;
 
     // connect the device
-    USBDevice::connect();
+//     USBDevice::connect();
 }
 
 bool USBAudio::read(uint8_t * buf) {
@@ -85,7 +91,7 @@ bool USBAudio::readWrite(uint8_t * buf_read, uint8_t * buf_write) {
     SOF_handler = false;
     writeIN = false;
     if (interruptIN) {
-        USBDevice::writeNB(EP3IN, buf_write, PACKET_SIZE_ISO_OUT, PACKET_SIZE_ISO_OUT);
+        u->writeNB(EP3IN, buf_write, PACKET_SIZE_ISO_OUT, PACKET_SIZE_ISO_OUT);
     } else {
         buf_stream_out = buf_write;
     }
@@ -102,7 +108,7 @@ bool USBAudio::write(uint8_t * buf) {
     writeIN = false;
     SOF_handler = false;
     if (interruptIN) {
-        USBDevice::writeNB(EP3IN, buf, PACKET_SIZE_ISO_OUT, PACKET_SIZE_ISO_OUT);
+        u->writeNB(EP3IN, buf, PACKET_SIZE_ISO_OUT, PACKET_SIZE_ISO_OUT);
     } else {
         buf_stream_out = buf;
     }
@@ -207,9 +213,9 @@ bool USBAudio::USBCallback_setInterface(uint16_t interface, uint8_t alternate) {
 // Called by USBDevice on Endpoint0 request
 // This is used to handle extensions to standard requests and class specific requests.
 // Return true if class handles this request
-bool USBAudio::USBCallback_request() {
+bool USBAudio::USBCallback_request(transfer) {
     bool success = false;
-    CONTROL_TRANSFER * transfer = getTransferPtr();
+//     CONTROL_TRANSFER * transfer = getTransferPtr();
 
     // Process class-specific requests
     if (transfer->setup.bmRequestType.Type == CLASS_TYPE) {
@@ -616,3 +622,5 @@ uint8_t * USBAudio::stringIproductDesc() {
     };
     return stringIproductDescriptor;
 }
+
+#endif /* USB_AUDIO */
