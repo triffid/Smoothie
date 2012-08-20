@@ -20,11 +20,16 @@
 #define USBSERIAL_H
 
 #include "USBCDC.h"
-#include "Stream.h"
+// #include "Stream.h"
 #include "CircBuffer.h"
 
-#include "../../../../gcc4mbed/external/mbed/FunctionPointer.h"
+// #include "../../../../gcc4mbed/external/mbed/FunctionPointer.h"
 
+
+class USBSerial_Receiver {
+protected:
+    virtual bool SerialEvent_RX(void) = 0;
+};
 /**
 * USBSerial example
 *
@@ -45,7 +50,7 @@
 * }
 * @endcode
 */
-class USBSerial: public USBCDC {
+class USBSerial: public USBCDC, public USBSerial_Receiver {
 public:
 
     /**
@@ -56,7 +61,7 @@ public:
     * @param product_release Your preoduct_release (default: 0x0001)
     *
     */
-    USBSerial(USB *u): USBCDC(u), buf(128){ };
+    USBSerial(USB *);
 
 
     /**
@@ -99,31 +104,38 @@ public:
      *  @param tptr pointer to the object to call the member function on
      *  @param mptr pointer to the member function to be called
      */
-    template<typename T>
-    void attach(T* tptr, void (T::*mptr)(void)) {
-        if((mptr != NULL) && (tptr != NULL)) {
-            rx.attach(tptr, mptr);
-        }
-    }
+//     template<typename T>
+//     void attach(T* tptr, void (T::*mptr)(void)) {
+//         if((mptr != NULL) && (tptr != NULL)) {
+//             rx.attach(tptr, mptr);
+//         }
+//     }
 
     /**
      * Attach a callback called when a packet is received
      *
      * @param fptr function pointer
      */
-    void attach(void (*fn)(void)) {
-        if(fn != NULL) {
-            rx.attach(fn);
-        }
-    }
+//     void attach(void (*fn)(void)) {
+//         if(fn != NULL) {
+//             rx.attach(fn);
+//         }
+//     }
 
 
 protected:
-    virtual bool EpCallback(uint8_t, uint8_t);
+//     virtual bool EpCallback(uint8_t, uint8_t);
+    virtual bool USBEvent_EPIn(uint8_t, uint8_t);
+    virtual bool USBEvent_EPOut(uint8_t, uint8_t);
+
+    virtual bool SerialEvent_RX(void){return false;};
+
 
 private:
-    mbed::FunctionPointer rx;
-    CircBuffer<uint8_t> buf;
+    USB *usb;
+//     mbed::FunctionPointer rx;
+    CircBuffer<uint8_t> rxbuf;
+    CircBuffer<uint8_t> txbuf;
 };
 
 #endif

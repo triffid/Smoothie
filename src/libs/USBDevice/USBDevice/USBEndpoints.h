@@ -38,28 +38,35 @@ typedef enum {
     EP_STALLED,     /* Endpoint stalled */
 } EP_STATUS;
 
-class USB_Frame_Receiver {
+class USB_State_Receiver {
 public:
-    virtual bool FrameCallback(uint16_t) = 0;
+    virtual bool USBEvent_busReset(void) = 0;
+    virtual bool USBEvent_connectStateChanged(bool connected) = 0;
+    virtual bool USBEvent_suspendStateChanged(bool suspended) = 0;
 };
 
-class USB_EP_Receiver {
+class USB_Frame_Receiver {
 public:
-    virtual bool EpCallback(uint8_t bEP, uint8_t bEPStatus) = 0;
+//     virtual bool USB_Frame_Callback(uint16_t) = 0;
+    virtual bool USBEvent_Frame(uint16_t) = 0;
 };
 
 class USB_Class_Receiver {
 public:
-    virtual bool USBCallback_request(CONTROL_TRANSFER *) = 0;
+//     virtual bool USBCallback_request(CONTROL_TRANSFER *) = 0;
+    virtual bool USBEvent_Request(CONTROL_TRANSFER&) = 0;
+    virtual bool USBEvent_RequestComplete(CONTROL_TRANSFER&, uint8_t *buf, uint32_t length) = 0;
 };
 
-class USB_Setup_Receiver {
+class USB_Endpoint_Receiver : public USB_Class_Receiver {
 public:
-    virtual bool USB_Setup_Callback(CONTROL_TRANSFER *) = 0;
+    //     virtual bool EpCallback(uint8_t bEP, uint8_t bEPStatus) = 0;
+    virtual bool USBEvent_EPIn(uint8_t, uint8_t) = 0;
+    virtual bool USBEvent_EPOut(uint8_t, uint8_t) = 0;
 };
 
 /* Include configuration for specific target */
-#if defined(TARGET_LPC1768) || defined(TARGET_LPC2368)
+#if defined(TARGET_LPC1768) || defined(TARGET_LPC2368) || defined(__LPC17XX__)
     #include "USBEndpoints_LPC17_LPC23.h"
 #elif defined(TARGET_LPC11U24)
     #include "USBEndpoints_LPC11U.h"

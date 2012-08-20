@@ -28,7 +28,7 @@
 
 #include "descriptor_cdc.h"
 
-class USBCDC: public USB_EP_Receiver, public USB_Class_Receiver, USB_Setup_Receiver {
+class USBCDC: public USB_Endpoint_Receiver {
 public:
 
     /*
@@ -102,11 +102,18 @@ protected:
     */
     bool readEP_NB(uint8_t * buffer, uint32_t * size);
 
-    virtual bool USBCallback_request(CONTROL_TRANSFER *);
+//     virtual bool USBCallback_request(CONTROL_TRANSFER *);
 //     virtual bool USBCallback_setConfiguration(uint8_t configuration);
 
-    virtual bool EpCallback(uint8_t, uint8_t);
-    virtual bool USB_Setup_Callback(CONTROL_TRANSFER *);
+//     virtual bool EpCallback(uint8_t, uint8_t);
+//     virtual bool USB_Setup_Callback(CONTROL_TRANSFER *);
+
+    virtual bool USBEvent_Request(CONTROL_TRANSFER&);
+    virtual bool USBEvent_RequestComplete(CONTROL_TRANSFER&, uint8_t*, uint32_t);
+
+//     virtual bool USBEvent_EPIn(uint8_t, uint8_t) = 0;
+//     virtual bool USBEvent_EPOut(uint8_t, uint8_t)= 0;
+
 
     USB *usb;
 

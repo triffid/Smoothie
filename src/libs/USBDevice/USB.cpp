@@ -105,12 +105,184 @@ void USB::init() {
 		}
 	}
 
-// 	USBDevice::init(descriptors);
+	setDescriptors(descriptors);
 
-	iprintf("OK\nconnect\n");
- 	connect();
-	iprintf("OK");
+    USBHAL::init();
+
+	iprintf("OK\n");
 }
+
+bool USB::USBCallback_setConfiguration(uint8_t configuration)
+{
+    int i = findDescriptor(0, DT_CONFIGURATION, configuration, 0);
+    if (i > 0)
+    {
+        uint8_t lastAlternate = 0;
+        for (; descriptors[i] != (usbdesc_base *) 0 && descriptors[i]->bDescType != DT_CONFIGURATION; i++) {
+            switch(descriptors[i]->bDescType)
+            {
+                case DT_INTERFACE: {
+                    usbdesc_interface *interface = (usbdesc_interface *) descriptors[i];
+                    interface->selectedAlternate = 0;
+                    lastAlternate = interface->bAlternateSetting;
+                    break;
+                };
+                case DT_ENDPOINT: {
+                    if (lastAlternate == 0) {
+                        usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
+                        realiseEndpoint(ep->bEndpointAddress, ep->wMaxPacketSize, ((ep->bmAttributes & 3) == EA_ISOCHRONOUS)?ISOCHRONOUS:0);
+                    }
+                    break;
+                };
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+bool USB::USBCallback_setInterface(uint16_t interface, uint8_t alternate) {
+    int i = findDescriptor(0, DT_INTERFACE, interface, alternate);
+    if (i > 0)
+    {
+        int j = findDescriptor(0, DT_INTERFACE, interface, 0);
+        if (j > 0) {
+            ((usbdesc_interface *) descriptors[j])->selectedAlternate = alternate;
+            for (; (descriptors[i]->bDescType != DT_INTERFACE) && (descriptors[i]->bDescType != DT_CONFIGURATION); i++) {
+                if (descriptors[i]->bDescType == DT_ENDPOINT) {
+                    usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
+                    realiseEndpoint(ep->bEndpointAddress, ep->wMaxPacketSize, ((ep->bmAttributes & 3) == EA_ISOCHRONOUS)?ISOCHRONOUS:0);
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool USB::USBEvent_busReset(void)
+{
+    iprintf("USB:Bus Reset\n");
+    USBDevice::USBEvent_busReset();
+
+    return false;
+}
+
+bool USB::USBEvent_connectStateChanged(bool connected)
+{
+    // TODO: something useful
+    if (connected)
+    {
+        iprintf("USB:Connected\n");
+        connect();
+    }
+    else
+    {
+        iprintf("USB:Disconnected\n");
+        disconnect();
+    }
+    return true;
+};
+
+bool USB::USBEvent_suspendStateChanged(bool suspended)
+{
+    // TODO: something useful
+    if (suspended)
+    {
+        iprintf("USB:Suspended\n");
+    }
+    else
+    {
+        iprintf("USB:Unsuspended\n");
+    }
+    return true;
+};
+
+bool USB::USBEvent_Request(CONTROL_TRANSFER& transfer)
+{
+    if ((transfer.setup.bmRequestType.Type == CLASS_TYPE) ||
+        (transfer.setup.bmRequestType.Type == VENDOR_TYPE))
+    {
+        // decode request destination
+        switch(transfer.setup.bmRequestType.Recipient)
+        {
+            case INTERFACE_RECIPIENT: {
+                int i = findDescriptor(0, DT_INTERFACE, transfer.setup.wIndex, 0);
+                if (i >.0)
+                {
+                    usbdesc_interface *interface = (usbdesc_interface *) descriptors[i];
+                    return interface->classReceiver->USBEvent_Request(transfer);
+                }
+                break;
+            };
+            case ENDPOINT_RECIPIENT: {
+                int i = findDescriptor(0, DT_ENDPOINT, transfer.setup.wIndex, 0);
+                if (i >.0)
+                {
+                    usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
+                    return ep->epReceiver->USBEvent_Request(transfer);
+                }
+                break;
+            }
+        }
+    }
+    return false;
+};
+
+bool USB::USBEvent_RequestComplete(CONTROL_TRANSFER& transfer, uint8_t *buf, uint32_t length)
+{
+    if ((transfer.setup.bmRequestType.Type == CLASS_TYPE) ||
+        (transfer.setup.bmRequestType.Type == VENDOR_TYPE))
+    {
+        // decode request destination
+        switch(transfer.setup.bmRequestType.Recipient)
+        {
+            case INTERFACE_RECIPIENT: {
+                int i = findDescriptor(0, DT_INTERFACE, transfer.setup.wIndex, 0);
+                if (i >.0)
+                {
+                    usbdesc_interface *interface = (usbdesc_interface *) descriptors[i];
+                    interface->classReceiver->USBEvent_RequestComplete(transfer, buf, length);
+                }
+                break;
+            };
+            case ENDPOINT_RECIPIENT: {
+                int i = findDescriptor(0, DT_ENDPOINT, transfer.setup.wIndex, 0);
+                if (i >.0)
+                {
+                    usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
+                    ep->epReceiver->USBEvent_RequestComplete(transfer, buf, length);
+                }
+                break;
+            }
+        }
+    }
+    return false;
+    return false;
+};
+
+bool USB::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
+{
+    int i = findDescriptor(0, DT_ENDPOINT, bEP, 0);
+    if (i > 0)
+    {
+        usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
+        ep->epReceiver->USBEvent_EPIn(bEP, bEPStatus);
+    }
+    return false;
+
+};
+
+bool USB::USBEvent_EPOut(uint8_t bEP, uint8_t bEPStatus)
+{
+    int i = findDescriptor(0, DT_ENDPOINT, bEP, 0);
+    if (i > 0)
+    {
+        usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
+        ep->epReceiver->USBEvent_EPOut(bEP, bEPStatus);
+    }
+    return false;
+};
+
 
 int USB::addDescriptor(usbdesc_base *descriptor) {
 	for (int i = 0; i < N_DESCRIPTORS; i++) {
@@ -123,8 +295,51 @@ int USB::addDescriptor(usbdesc_base *descriptor) {
 	return -1;
 }
 
-int USB::addDescriptor(void *descriptor) {
+int USB::addDescriptor(void *descriptor)
+{
 	return addDescriptor((usbdesc_base *) descriptor);
+}
+
+int USB::findDescriptor(uint8_t start, uint8_t type, uint8_t index, uint8_t alternate)
+{
+    int i;
+    int count = 0;
+    for (i = start; descriptors[i] != (usbdesc_base *) 0; i++) {
+        if (descriptors[i]->bDescType == type) {
+            // some descriptors have their own indexes, use if available
+            switch (descriptors[i]->bDescType)
+            {
+                case DT_CONFIGURATION:
+                    count = ((usbdesc_configuration *) descriptors[i])->bConfigurationValue;
+                    break;
+                case DT_INTERFACE:
+                    count = ((usbdesc_interface *) descriptors[i])->bInterfaceNumber;
+                    break;
+                case DT_ENDPOINT:
+                    count = ((usbdesc_endpoint *) descriptors[i])->bEndpointAddress;
+                    break;
+                default:
+                    break;
+            }
+            // if we've reached the specified descriptor
+            if (count == index) {
+                // and it's either the right alternate, or it's not an interface
+                if (
+                    (type != DT_INTERFACE)
+                    ||
+                    (((usbdesc_interface *) descriptors[i])->bAlternateSetting == alternate)
+                   )
+                {
+                    // return index into descriptors array
+                    return i;
+                }
+            }
+            // increase count
+            // for descriptors with their own indexes, this has no effect as the count is overwritten next time we loop
+            count++;
+        }
+    }
+    return -1;
 }
 
 int USB::addInterface(usbdesc_interface *ifp) {
@@ -196,13 +411,6 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 
 	int n = getFreeEndpoint();
 
-// 	iprintf("n:%d ", n);
-
-// 	iprintf("0x%02X:%s ", epp->bEndpointAddress, ((epp->bEndpointAddress & EP_DIR_IN)?"IN":"OUT"));
-
-// 	iprintf("%p ", epp);
-
-	// TODO: assign .bEndpointAddress appropriately
     // TODO: move this to the hardware-specific class
 	// we need to scan through our descriptors, and find the first unused logical endpoint of the appropriate type
 	// the LPC17xx has 16 logical endpoints mapped to 32 "physical" endpoints, looks like this means we have 16 endpoints to use and we get to pick direction
@@ -222,8 +430,6 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 		}
 	}
 
-// 	iprintf("lep:%d ", lepaddr);
-
 	// now, lepaddr is the last logical endpoint of appropriate type
 	// the endpoints go in groups of 3, except for the last one which is a bulk instead of isochronous
 	// find the next free lep using this simple pattern
@@ -236,17 +442,11 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 	// if it's >15 we've run out, spit an error
 	if (lepaddr > 15) return -1;
 
-// 	iprintf("pep:%d ", lepaddr);
-
 	// store logical address and direction bit
 	epp->bEndpointAddress = lepaddr | (epp->bEndpointAddress & 0x80);
 
-// 	iprintf("eaddr:0x%02X ", epp->bEndpointAddress);
-
 	descriptors[i] = (usbdesc_base *) epp;
 	// 	lastif->bNumEndPoints = n + 1;
-
-// 	iprintf(" EP complete]\n");
 
 	conf.wTotalLength += descriptors[i]->bLength;
 
@@ -300,7 +500,7 @@ int USB::findStringIndex(uint8_t strid) {
 
 void USB::dumpDevice(usbdesc_device *d) {
 	iprintf("Device:\n");
-	iprintf("\tUSB Version:  %d.%d\n", d->bcdUSB >> 8, d->bcdUSB & 0xFF);
+	iprintf("\tUSB Version:  %d.%d\n", d->bcdUSB >> 8, (d->bcdUSB & 0xFF) >> 4);
 	iprintf("\tClass:        0x%04X\n", d->bDeviceClass);
 	iprintf("\tSubClass:     0x%04X\n", d->bDeviceSubClass);
 	iprintf("\tProtocol:     0x%04X\n", d->bDeviceProtocol);

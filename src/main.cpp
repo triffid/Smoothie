@@ -34,10 +34,11 @@ SDFileSystem sd(p5, p6, p7, p8, "sd");  // LPC17xx specific : comment if you are
 USB usb(SMOOTHIE_USB_VENDOR, SMOOTHIE_USB_PRODUCT, SMOOTHIE_FIRMWARE_REVISION);
 
 USBSerial usb_serial(&usb);
-USBMSC usb_msc(&usb, &SDFileSystem);
-USBECM usb_ethernet(&usb);
+// USBMSC usb_msc(&usb, &SDFileSystem);
+// USBECM usb_ethernet(&usb);
 
 int main() {
+    usb.init();
     usb.connect();
 
     Kernel* kernel = new Kernel();
@@ -52,7 +53,7 @@ int main() {
     kernel->add_module( new TemperatureControlPool() );
     kernel->add_module( new PauseButton() );
 
-    kernel->add_module( &usb_serial );
+//     kernel->add_module( &usb_serial );
 
     kernel->serial->printf("start\r\n");
 

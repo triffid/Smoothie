@@ -21,29 +21,29 @@
 
 static uint8_t cdc_line_coding[7]= {0x80, 0x25, 0x00, 0x00, 0x00, 0x00, 0x08};
 
-#define DEFAULT_CONFIGURATION (1)
+// #define DEFAULT_CONFIGURATION (1)
 
-#define CDC_SET_LINE_CODING        0x20
-#define CDC_GET_LINE_CODING        0x21
-#define CDC_SET_CONTROL_LINE_STATE 0x22
+// #define CDC_SET_LINE_CODING        0x20
+// #define CDC_GET_LINE_CODING        0x21
+// #define CDC_SET_CONTROL_LINE_STATE 0x22
 
-#define MAX_CDC_REPORT_SIZE MAX_PACKET_SIZE_EPBULK
+// #define MAX_CDC_REPORT_SIZE MAX_PACKET_SIZE_EPBULK
 
 USBCDC::USBCDC(USB *u) {
     usb = u;
 
     CDC_if = {
-        DL_INTERFACE,           // bLength
-        DT_INTERFACE,           // bDescType
-        0,                      // bInterfaceNumber: filled out during addInterface()
-        0,                      // bAlternateSetting
-        1,                      // bNumEndpoints
-        UC_COMM,                // bInterfaceClass
-        USB_CDC_SUBCLASS_ACM,   // bInterfaceSubClass
-        1,                      // bInterfaceProtocol
-        0,                      // iInterface
-        0, 0, 0,                // dummy padding
-        this,                   // callback
+        DL_INTERFACE,               // bLength
+        DT_INTERFACE,               // bDescType
+        0,                          // bInterfaceNumber: filled out during addInterface()
+        0,                          // bAlternateSetting
+        1,                          // bNumEndpoints
+        UC_COMM,                    // bInterfaceClass
+        USB_CDC_SUBCLASS_ACM,       // bInterfaceSubClass
+        USB_CDC_PROTOCOL_ITU_V250,  // bInterfaceProtocol
+        0,                          // iInterface
+        0, 0, 0,                    // dummy padding
+        this,                       // callback
     };
     CDC_intep = {
         DL_ENDPOINT,            // bLength
@@ -54,7 +54,6 @@ USBCDC::USBCDC(USB *u) {
         16,                     // bInterval
         0,                      // dummy padding
         this,                   // endpoint callback
-        this,                   // setup callback
     };
     CDC_header = {
         USB_CDC_LENGTH_HEADER,  // bLength
@@ -104,7 +103,6 @@ USBCDC::USBCDC(USB *u) {
         0,                      // bInterval
         0,                      // dummy padding
         this,                   // endpoint callback
-        this,                   // setup callback
     };
     CDC_BulkOut = {
         DL_ENDPOINT,            // bLength
@@ -115,239 +113,74 @@ USBCDC::USBCDC(USB *u) {
         0,                      // bInterval
         0,                      // dummy padding
         this,                   // endpoint callback
-        this,                   // setup callback
     };
 
     uint8_t IfAddr =
         usb->addInterface(&CDC_if);
-    uint8_t EpIntAddr =
-        usb->addEndpoint(&CDC_intep);
-        usb->addDescriptor(&CDC_callmgmt);
-        usb->addDescriptor(&CDC_acm);
-        usb->addDescriptor(&CDC_union);
+    usb->addEndpoint(&CDC_intep);
+    usb->addDescriptor(&CDC_callmgmt);
+    usb->addDescriptor(&CDC_acm);
+    usb->addDescriptor(&CDC_union);
     uint8_t slaveIfAddr =
         usb->addInterface(&CDC_slaveif);
-    uint8_t EpInAddr =
-        usb->addEndpoint(&CDC_BulkIn);
-    uint8_t EpOutAddr =
-        usb->addEndpoint(&CDC_BulkOut);
+    usb->addEndpoint(&CDC_BulkIn);
+    usb->addEndpoint(&CDC_BulkOut);
 
     CDC_union.bMasterInterface = IfAddr;
     CDC_union.bSlaveInterface0 = slaveIfAddr;
 }
 
-bool USBCDC::USBCallback_request(CONTROL_TRANSFER *transfer) {
-    /* Called in ISR context */
-
-    bool success = false;
-//     CONTROL_TRANSFER * transfer = getTransferPtr();
+/* Called in ISR context */
+bool USBCDC::USBEvent_Request(CONTROL_TRANSFER &transfer) {
 
     /* Process class-specific requests */
 
-    if (transfer->setup.bmRequestType.Type == CLASS_TYPE) {
-        switch (transfer->setup.bRequest) {
+    if (transfer.setup.bmRequestType.Type == CLASS_TYPE) {
+        switch (transfer.setup.bRequest) {
             case CDC_GET_LINE_CODING:
-                transfer->remaining = 7;
-                transfer->ptr = cdc_line_coding;
-                transfer->direction = DEVICE_TO_HOST;
-                success = true;
-                break;
+                transfer.remaining = 7;
+                transfer.ptr = cdc_line_coding;
+                transfer.direction = DEVICE_TO_HOST;
+                return true;
             case CDC_SET_LINE_CODING:
-                transfer->remaining = 7;
-                success = true;
-                break;
+                transfer.remaining = 7;
+                transfer.ptr = cdc_line_coding;
+                return true;
             case CDC_SET_CONTROL_LINE_STATE:
-                success = true;
-                break;
+                return true;
             default:
                 break;
         }
     }
 
-    return success;
+    return false;
+}
+
+bool USBCDC::USBEvent_RequestComplete(CONTROL_TRANSFER&, uint8_t*, uint32_t)
+{
+    return false;
 }
 
 #define EPINT_IN    CDC_intep.bEndpointAddress
 #define EPBULK_IN   CDC_BulkIn.bEndpointAddress
 #define EPBULK_OUT  CDC_BulkOut.bEndpointAddress
 
-// Called in ISR context
-// Set configuration. Return false if the
-// configuration is not supported.
-// bool USBCDC::USBCallback_setConfiguration(uint8_t configuration) {
-//     if (configuration != DEFAULT_CONFIGURATION) {
-//         return false;
-//     }
-//
-//     // Configure endpoints > 0
-// //     usb->addEndpoint(EPINT_IN, MAX_PACKET_SIZE_EPINT);
-// //     usb->addEndpoint(EPBULK_IN, MAX_PACKET_SIZE_EPBULK);
-// //     usb->addEndpoint(EPBULK_OUT, MAX_PACKET_SIZE_EPBULK);
-//
-//     // We activate the endpoint to be able to recceive data
-//     usb->readStart(EPBULK_OUT, MAX_PACKET_SIZE_EPBULK);
-//     return true;
-// }
-
 bool USBCDC::send(uint8_t * buffer, uint32_t size) {
-    return usb->write(EPBULK_IN, buffer, size, MAX_CDC_REPORT_SIZE);
+    return usb->write(EPBULK_IN, buffer, size, CDC_BulkIn.wMaxPacketSize);
 }
 
 bool USBCDC::readEP(uint8_t * buffer, uint32_t * size) {
-    if (!usb->readEP(EPBULK_OUT, buffer, size, MAX_CDC_REPORT_SIZE))
+    if (!usb->readEP(EPBULK_OUT, buffer, size, CDC_BulkOut.wMaxPacketSize))
         return false;
-    if (!usb->readStart(EPBULK_OUT, MAX_CDC_REPORT_SIZE))
+    if (!usb->readStart(EPBULK_OUT, CDC_BulkOut.wMaxPacketSize))
         return false;
     return true;
 }
 
 bool USBCDC::readEP_NB(uint8_t * buffer, uint32_t * size) {
-    if (!usb->readEP_NB(EPBULK_OUT, buffer, size, MAX_CDC_REPORT_SIZE))
+    if (!usb->readEP_NB(EPBULK_OUT, buffer, size, CDC_BulkOut.wMaxPacketSize))
         return false;
-    if (!usb->readStart(EPBULK_OUT, MAX_CDC_REPORT_SIZE))
+    if (!usb->readStart(EPBULK_OUT, CDC_BulkOut.wMaxPacketSize))
         return false;
     return true;
 }
-
-bool USBCDC::EpCallback(uint8_t bEP, uint8_t bEPStatus) {
-    return false;
-}
-
-bool USBCDC::USB_Setup_Callback(CONTROL_TRANSFER *transfer) {
-    return false;
-}
-
-/*
-uint8_t * USBCDC::deviceDesc() {
-    static uint8_t deviceDescriptor[] = {
-        18,                   // bLength
-        1,                    // bDescriptorType
-        0x10, 0x01,           // bcdUSB
-        2,                    // bDeviceClass
-        0,                    // bDeviceSubClass
-        0,                    // bDeviceProtocol
-        MAX_PACKET_SIZE_EP0,  // bMaxPacketSize0
-        LSB(VENDOR_ID), MSB(VENDOR_ID),  // idVendor
-        LSB(PRODUCT_ID), MSB(PRODUCT_ID),// idProduct
-        0x00, 0x01,           // bcdDevice
-        1,                    // iManufacturer
-        2,                    // iProduct
-        3,                    // iSerialNumber
-        1                     // bNumConfigurations
-    };
-    return deviceDescriptor;
-}
-
-uint8_t * USBCDC::stringIinterfaceDesc() {
-    static uint8_t stringIinterfaceDescriptor[] = {
-        0x08,
-        STRING_DESCRIPTOR,
-        'C',0,'D',0,'C',0,
-    };
-    return stringIinterfaceDescriptor;
-}
-
-uint8_t * USBCDC::stringIproductDesc() {
-    static uint8_t stringIproductDescriptor[] = {
-        0x16,
-        STRING_DESCRIPTOR,
-        'C',0,'D',0,'C',0,' ',0,'D',0,'E',0,'V',0,'I',0,'C',0,'E',0
-    };
-    return stringIproductDescriptor;
-}
-
-
-#define CONFIG1_DESC_SIZE (9+9+5+5+4+5+7+9+7+7)
-
-uint8_t * USBCDC::configurationDesc() {
-    static uint8_t configDescriptor[] = {
-        9,                      // bLength;
-        2,                      // bDescriptorType;
-        LSB(CONFIG1_DESC_SIZE), // wTotalLength
-        MSB(CONFIG1_DESC_SIZE),
-        2,                      // bNumInterfaces
-        1,                      // bConfigurationValue
-        0,                      // iConfiguration
-        0x80,                   // bmAttributes
-        50,                     // bMaxPower
-
-        // interface descriptor, USB spec 9.6.5, page 267-269, Table 9-12
-        9,                      // bLength
-        4,                      // bDescriptorType
-        0,                      // bInterfaceNumber
-        0,                      // bAlternateSetting
-        1,                      // bNumEndpoints
-        0x02,                   // bInterfaceClass
-        0x02,                   // bInterfaceSubClass
-        0x01,                   // bInterfaceProtocol
-        0,                      // iInterface
-
-        // CDC Header Functional Descriptor, CDC Spec 5.2.3.1, Table 26
-        5,                      // bFunctionLength
-        0x24,                   // bDescriptorType
-        0x00,                   // bDescriptorSubtype
-        0x10, 0x01,             // bcdCDC
-
-        // Call Management Functional Descriptor, CDC Spec 5.2.3.2, Table 27
-        5,                      // bFunctionLength
-        0x24,                   // bDescriptorType
-        0x01,                   // bDescriptorSubtype
-        0x03,                   // bmCapabilities
-        1,                      // bDataInterface
-
-        // Abstract Control Management Functional Descriptor, CDC Spec 5.2.3.3, Table 28
-        4,                      // bFunctionLength
-        0x24,                   // bDescriptorType
-        0x02,                   // bDescriptorSubtype
-        0x06,                   // bmCapabilities
-
-        // Union Functional Descriptor, CDC Spec 5.2.3.8, Table 33
-        5,                      // bFunctionLength
-        0x24,                   // bDescriptorType
-        0x06,                   // bDescriptorSubtype
-        0,                      // bMasterInterface
-        1,                      // bSlaveInterface0
-
-        // endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
-        ENDPOINT_DESCRIPTOR_LENGTH,     // bLength
-        ENDPOINT_DESCRIPTOR,            // bDescriptorType
-        PHY_TO_DESC(EPINT_IN),          // bEndpointAddress
-        E_INTERRUPT,                    // bmAttributes (0x03=intr)
-        LSB(MAX_PACKET_SIZE_EPINT),     // wMaxPacketSize (LSB)
-        MSB(MAX_PACKET_SIZE_EPINT),     // wMaxPacketSize (MSB)
-        16,                             // bInterval
-
-
-
-
-        // interface descriptor, USB spec 9.6.5, page 267-269, Table 9-12
-        9,          // bLength
-        4,          // bDescriptorType
-        1,          // bInterfaceNumber
-        0,          // bAlternateSetting
-        2,          // bNumEndpoints
-        0x0A,       // bInterfaceClass
-        0x00,       // bInterfaceSubClass
-        0x00,       // bInterfaceProtocol
-        0,          // iInterface
-
-        // endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
-        7,                      // bLength
-        5,                      // bDescriptorType
-        PHY_TO_DESC(EPBULK_IN), // bEndpointAddress
-        0x02,                   // bmAttributes (0x02=bulk)
-        LSB(MAX_PACKET_SIZE_EPBULK),    // wMaxPacketSize (LSB)
-        MSB(MAX_PACKET_SIZE_EPBULK),    // wMaxPacketSize (MSB)
-        0,                      // bInterval
-
-        // endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
-        7,                      // bLength
-        5,                      // bDescriptorType
-        PHY_TO_DESC(EPBULK_OUT),// bEndpointAddress
-        0x02,                   // bmAttributes (0x02=bulk)
-        LSB(MAX_PACKET_SIZE_EPBULK),    // wMaxPacketSize (LSB)
-        MSB(MAX_PACKET_SIZE_EPBULK),     // wMaxPacketSize (MSB)
-        0                       // bInterval
-    };
-    return configDescriptor;
-}*/

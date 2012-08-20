@@ -19,6 +19,8 @@
 #ifndef CIRCBUFFER_H
 #define CIRCBUFFER_H
 
+#include <stdlib.h>
+
 template <class T>
 class CircBuffer {
 public:
@@ -48,6 +50,9 @@ public:
 
     uint16_t available() {
         return (write >= read) ? write - read : size - read + write;
+    };
+    uint16_t free() {
+        return size - available();
     };
 
     bool dequeue(T * c) {

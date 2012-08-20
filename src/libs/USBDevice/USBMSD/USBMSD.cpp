@@ -95,7 +95,6 @@ USBMSD::USBMSD(USB *u, MSD_Disk *d) {
         0,                      // bInterval
         0,                      // dummy padding
         this,                   // endpoint callback
-        this,                   // setup callback
     };
     MSC_BulkOut = {
         DL_ENDPOINT,            // bLength
@@ -106,7 +105,6 @@ USBMSD::USBMSD(USB *u, MSD_Disk *d) {
         0,                      // bInterval
         0,                      // dummy padding
         this,                   // endpoint callback
-        this,                   // setup callback
     };
 
     MSC_Description.bLength =   26;
@@ -646,7 +644,7 @@ bool USBMSD::USBCallback_setConfiguration(uint8_t configuration) {
 // }
 
 
-uint8_t * USBMSD::configurationDesc() {
+// uint8_t * USBMSD::configurationDesc() {
 //     static uint8_t configDescriptor[] = {
 //
 //         // Configuration 1
@@ -690,4 +688,4 @@ uint8_t * USBMSD::configurationDesc() {
 //         0                           // bInterval
 //     };
 //     return configDescriptor;
-}
+// }

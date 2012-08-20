@@ -104,7 +104,7 @@ class MSD_Disk {
  * If disk_status() returns 1 (disk not initialized), then disk_initialize() is called. After this step, connect() will collect information
  * such as the number of blocks and the memory size.
  */
-class USBMSD: public USB_EP_Receiver, public USB_Setup_Receiver {
+class USBMSD: public USB_Endpoint_Receiver {
 public:
 
     /**

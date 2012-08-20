@@ -132,6 +132,7 @@ INCDIRS += $(PROJINCS) $(EXTERNAL_DIR)/mbed $(EXTERNAL_DIR)/mbed/LPC1768 $(EXTER
 DEFINES = -DTARGET_LPC1768 -DGCC4MBED_DELAYED_STDIO_INIT=$(GCC4MBED_DELAYED_STDIO_INIT)
 DEFINES += -DMRI_ENABLE=$(MRI_ENABLE) -DMRI_INIT_PARAMETERS='"$(MRI_INIT_PARAMETERS)"' -DMRI_BREAK_ON_INIT=$(MRI_BREAK_ON_INIT)
 DEFINES += -DMRI_SEMIHOST_STDIO=$(MRI_SEMIHOST_STDIO)
+DEFINES += -DMBED
 
 # Libraries to be linked into final binary
 LIBS = $(LIBS_PREFIX) $(GCC4MBED_DIR)/mri/mri.ar $(EXTERNAL_DIR)/mbed/LPC1768/mbed.ar $(EXTERNAL_DIR)/mbed/LPC1768/capi.ar $(EXTERNAL_DIR)/FATFileSystem/LPC1768/FATFileSystem.ar $(LIBS_SUFFIX)
@@ -207,7 +208,7 @@ endif
 
 .cpp.o :
 	@echo "  CPP   " $@
-	@$(GPP) $(GPFLAGS) -c $< -o $(<:.cpp=.o)
+	$(GPP) $(GPFLAGS) -c $< -o $(<:.cpp=.o)
 
 .S.o :
 	@echo "  AS    " $@

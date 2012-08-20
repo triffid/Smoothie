@@ -66,7 +66,7 @@ typedef struct {
 typedef struct {
     SETUP_PACKET setup;
     uint8_t *ptr;
-    uint32_t remaining;
+    int32_t remaining;
     uint8_t direction;
     bool zlp;
     bool notify;

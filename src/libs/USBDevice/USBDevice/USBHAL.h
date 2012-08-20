@@ -24,11 +24,14 @@
 // #include "mbed.h"
 #include "USBEndpoints.h"
 
-class USBHAL {
+class USBHAL : public USB_State_Receiver, public USB_Frame_Receiver, public USB_Endpoint_Receiver {
 public:
     /* Configuration */
     USBHAL();
     ~USBHAL();
+
+    void init(void);
+
     void connect(void);
     void disconnect(void);
     void configureDevice(void);
@@ -52,30 +55,41 @@ public:
     void stallEndpoint(uint8_t endpoint);
     void unstallEndpoint(uint8_t endpoint);
     bool realiseEndpoint(uint8_t endpoint, uint32_t maxPacket, uint32_t options);
-    bool getEndpointStallState(unsigned char endpoint);
+    bool getEndpointStallState(uint8_t endpoint);
     uint32_t endpointReadcore(uint8_t endpoint, uint8_t *buffer);
 
+    /* misc hardware stuff */
     uint32_t getSerialNumber(int length, uint32_t *buf);
 
+    static void _usbisr(void);
+
 protected:
+    /* callbacks */
+    //     virtual bool USB_Frame_Callback(uint16_t);
+    //     virtual bool USB_Ep_Callback(uint8_t, uint8_t);
+    //     virtual bool USB_DevInt_Callback(void);
+    virtual bool USBEvent_busReset(void){return false;};
+    virtual bool USBEvent_connectStateChanged(bool connected){return false;};
+    virtual bool USBEvent_suspendStateChanged(bool suspended){return false;};
+
+    virtual bool USBEvent_Frame(uint16_t){return false;};
+
+    virtual bool USBEvent_Request(CONTROL_TRANSFER&){return false;};
+    virtual bool USBEvent_RequestComplete(CONTROL_TRANSFER&, uint8_t *, uint32_t){return false;};
+
+    virtual bool USBEvent_EPIn(uint8_t, uint8_t){return false;};
+    virtual bool USBEvent_EPOut(uint8_t, uint8_t){return false;};
+
     virtual void busReset(void){};
-    virtual void epIntHandler(uint8_t){};
     virtual void EP0setupCallback(void){};
     virtual void EP0out(void){};
     virtual void EP0in(void){};
     virtual void connectStateChanged(unsigned int connected){};
     virtual void suspendStateChanged(unsigned int suspended){};
     virtual void SOF(int frameNumber){};
-    virtual bool EP1_OUT_callback(){return false;};
-    virtual bool EP1_IN_callback(){return false;};
-    virtual bool EP2_OUT_callback(){return false;};
-    virtual bool EP2_IN_callback(){return false;};
-    virtual bool EP3_OUT_callback(){return false;};
-    virtual bool EP3_IN_callback(){return false;};
 
 private:
     void usbisr(void);
-    static void _usbisr(void);
     static USBHAL * instance;
 };
 #endif

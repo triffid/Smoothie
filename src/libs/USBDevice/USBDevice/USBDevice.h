@@ -53,6 +53,11 @@ public:
     void disconnect(void);
 
     /*
+     * get last frame number
+     */
+    uint16_t lastFrame(void);
+
+    /*
     * Add an endpoint
     *
     * @param endpoint endpoint which will be added
@@ -129,7 +134,7 @@ public:
     *
     * May be used to reset state
     */
-    virtual void USBCallback_busReset(void) {};
+//     virtual void USBCallback_busReset(void) {};
 
     /*
     * Called by USBDevice on Endpoint0 request. Warning: Called in ISR context
@@ -138,7 +143,7 @@ public:
     *
     * @returns true if class handles this request
     */
-    virtual bool USBCallback_request() { return false; };
+//     virtual bool USBCallback_request() { return false; };
 
     /*
     * Called by USBDevice on Endpoint0 request completion
@@ -150,7 +155,7 @@ public:
     * @param buf buffer received on endpoint 0
     * @param length length of this buffer
     */
-    virtual void USBCallback_requestCompleted(uint8_t * buf, uint32_t length) {};
+//     virtual void USBCallback_requestCompleted(uint8_t * buf, uint32_t length) {};
 
     /*
     * Called by USBDevice layer. Set configuration of the device.
@@ -236,15 +241,22 @@ public:
 
 
 protected:
-    virtual void busReset(void);
+    virtual bool USBEvent_busReset(void);
+
     virtual void EP0setupCallback(void);
     virtual void EP0out(void);
     virtual void EP0in(void);
-    virtual void epIntHandler(uint8_t);
-    virtual void connectStateChanged(unsigned int connected);
-    virtual void suspendStateChanged(unsigned int suspended);
-    uint8_t * findDescriptor(uint8_t descriptorType);
+
+    virtual bool USBEvent_Frame(uint16_t);
+
+//     virtual void epIntHandler(uint8_t);
+//     virtual void connectStateChanged(unsigned int connected);
+//     virtual void suspendStateChanged(unsigned int suspended);
+
+    int  findDescriptorIndex(uint8_t descriptorType, uint8_t descriptorIndex);
     uint8_t * findDescriptor(uint8_t descriptorType, uint8_t descriptorIndex);
+    uint8_t * findDescriptor(uint8_t descriptorType);
+
     CONTROL_TRANSFER * getTransferPtr(void);
 
     uint16_t VENDOR_ID;
@@ -270,6 +282,8 @@ private:
     bool assembleConfigDescriptor(void);
 
     usbdesc_base **descriptors;
+
+    volatile uint16_t lastFrameIndex;
 
     CONTROL_TRANSFER transfer;
     USB_DEVICE device;
