@@ -294,7 +294,7 @@ bool USB::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
     if (i > 0)
     {
         usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
-        iprintf("[EPIn 0x%02X ST 0x%02X Handler %p]", bEP, bEPStatus, ep->epReceiver);
+//         iprintf("[EPIn 0x%02X ST 0x%02X Handler %p]", bEP, bEPStatus, ep->epReceiver);
         ep->epReceiver->USBEvent_EPIn(bEP, bEPStatus);
     }
     return false;
@@ -303,13 +303,13 @@ bool USB::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
 
 bool USB::USBEvent_EPOut(uint8_t bEP, uint8_t bEPStatus)
 {
-    iprintf("[EPOut 0x%02X ST 0x%02X]\n", bEP, bEPStatus);
+//     iprintf("[EPOut 0x%02X ST 0x%02X]\n", bEP, bEPStatus);
     int i = findDescriptorIndex(0, DT_ENDPOINT, bEP, 0);
     if (i > 0)
     {
-        iprintf("[@%d ", i);
+//         iprintf("[@%d ", i);
         usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
-        iprintf("Handler %p]\n", ep->epReceiver);
+//         iprintf("Handler %p]\n", ep->epReceiver);
         return ep->epReceiver->USBEvent_EPOut(bEP, bEPStatus);
     }
     return false;

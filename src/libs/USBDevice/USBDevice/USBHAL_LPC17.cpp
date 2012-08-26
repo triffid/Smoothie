@@ -34,6 +34,7 @@
 
 // #include "lpc17xx_usb.h"
 
+#define iprintf(...)
 
 // Get endpoint direction
 #define IN_EP(endpoint)     ((endpoint) & 1U ? true : false)
@@ -744,7 +745,7 @@ void USBHAL::usbisr(void) {
             realiseEndpoint(IDX2EP(EP0IN), MAX_PACKET_SIZE_EP0, 0);
             realiseEndpoint(IDX2EP(EP0OUT), MAX_PACKET_SIZE_EP0, 0);
 
-            SIEsetMode(SIE_MODE_INAK_CI | SIE_MODE_INAK_CO | SIE_MODE_INAK_BO);
+            SIEsetMode(SIE_MODE_INAK_CI | SIE_MODE_INAK_CO);
         }
 
         if (devStat & SIE_DS_CON_CH) {
@@ -779,7 +780,7 @@ void USBHAL::usbisr(void) {
             uint32_t bitmask;
             for (i = 2, bitmask = 4; i < 32; i++, bitmask <<= 1) {
                 if (epComplete & bitmask) {
-                    uint8_t bEPStat = selectEndpointClearInterrupt(i);
+                    uint8_t bEPStat = selectEndpointClearInterrupt(IDX2EP(i));
                     uint8_t bStat = ((bEPStat & EPSTAT_FE ) ? EP_STATUS_DATA    : 0) |
                                     ((bEPStat & EPSTAT_ST ) ? EP_STATUS_STALLED : 0) |
                                     ((bEPStat & EPSTAT_STP) ? EP_STATUS_SETUP   : 0) |
@@ -797,7 +798,6 @@ void USBHAL::usbisr(void) {
                         if (USBEvent_EPOut(IDX2EP(i), bStat))
                             epComplete &= ~bitmask;
                     }
-                    LPC_USB->USBEpIntClr = (~epComplete) & bitmask;
                 }
             }
         }

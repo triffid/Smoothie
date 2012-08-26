@@ -45,6 +45,8 @@
 #define WINDEX_TO_PHYSICAL(endpoint) (((endpoint & 0x0f) << 1) + \
     ((endpoint & 0x80) ? 1 : 0))
 
+#define iprintf(...)
+
 bool USBDevice::setDescriptors(usbdesc_base ** newDescriptors)
 {
     if (configured() == false)

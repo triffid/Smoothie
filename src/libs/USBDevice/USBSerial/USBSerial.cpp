@@ -21,6 +21,8 @@
 
 #include "USBSerial.h"
 
+#define iprintf(...)
+
 USBSerial::USBSerial(USB *u): USBCDC(u), rxbuf(128), txbuf(128)
 {
     usb = u;
@@ -70,6 +72,8 @@ bool USBSerial::writeBlock(uint8_t * buf, uint16_t size)
 
 bool USBSerial::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
 {
+    static bool needToSendNull = false;
+
     iprintf("USBSerial:EpIn: 0x%02X\n", bEPStatus);
 
     if (bEP != CDC_BulkIn.bEndpointAddress)
@@ -94,9 +98,12 @@ bool USBSerial::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
         iprintf("\nSending...\n");
         send(b, l);
         iprintf("Sent\n");
+        if (l == 64 && txbuf.available() == 0)
+            needToSendNull = true;
     }
-    else {
+    else if (needToSendNull) {
         send(NULL, 0);
+        needToSendNull = false;
     }
     iprintf("USBSerial:EpIn Complete\n");
     return true;
@@ -122,11 +129,11 @@ bool USBSerial::USBEvent_EPOut(uint8_t bEP, uint8_t bEPStatus)
             iprintf("\\x%02X", c[i]);
     }
     iprintf("\nQueued, %d empty\n", rxbuf.free());
-    if (rxbuf.free() >= MAX_PACKET_SIZE_EPBULK)
-    {
-        iprintf("Sent ack\n");
-        send(NULL, 0);
-    }
+//     if (rxbuf.free() >= MAX_PACKET_SIZE_EPBULK)
+//     {
+//         iprintf("Sent ack\n");
+//         send(NULL, 0);
+//     }
 
     //call a potential handler
 //     rx.call();
