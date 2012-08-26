@@ -252,7 +252,7 @@ protected:
 //     virtual void epIntHandler(uint8_t);
 //     virtual void connectStateChanged(unsigned int connected);
 //     virtual void suspendStateChanged(unsigned int suspended);
-
+    int  findDescriptorIndex(uint8_t start, uint8_t descriptorType, uint8_t descriptorIndex, uint8_t alternate);
     int  findDescriptorIndex(uint8_t descriptorType, uint8_t descriptorIndex);
     uint8_t * findDescriptor(uint8_t descriptorType, uint8_t descriptorIndex);
     uint8_t * findDescriptor(uint8_t descriptorType);

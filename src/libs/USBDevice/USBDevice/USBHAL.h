@@ -48,15 +48,16 @@ public:
     void EP0stall(void);
 
     /* Other endpoints */
-    EP_STATUS endpointRead(uint8_t endpoint, uint32_t maximumSize);
-    EP_STATUS endpointReadResult(uint8_t endpoint, uint8_t *data, uint32_t *bytesRead);
-    EP_STATUS endpointWrite(uint8_t endpoint, uint8_t *data, uint32_t size);
-    EP_STATUS endpointWriteResult(uint8_t endpoint);
-    void stallEndpoint(uint8_t endpoint);
-    void unstallEndpoint(uint8_t endpoint);
-    bool realiseEndpoint(uint8_t endpoint, uint32_t maxPacket, uint32_t options);
-    bool getEndpointStallState(uint8_t endpoint);
-    uint32_t endpointReadcore(uint8_t endpoint, uint8_t *buffer);
+    EP_STATUS endpointRead(uint8_t bEP, uint32_t maximumSize);
+    EP_STATUS endpointReadResult(uint8_t bEP, uint8_t *data, uint32_t *bytesRead);
+    EP_STATUS endpointWrite(uint8_t bEP, uint8_t *data, uint32_t size);
+    EP_STATUS endpointWriteResult(uint8_t bEP);
+    uint8_t endpointStatus(uint8_t bEP);
+    void stallEndpoint(uint8_t bEP);
+    void unstallEndpoint(uint8_t bEP);
+    bool realiseEndpoint(uint8_t bEP, uint32_t maxPacket, uint32_t options);
+    bool getEndpointStallState(uint8_t bEP);
+    uint32_t endpointReadcore(uint8_t bEP, uint8_t *buffer);
 
     /* misc hardware stuff */
     uint32_t getSerialNumber(int length, uint32_t *buf);

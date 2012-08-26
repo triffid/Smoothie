@@ -199,7 +199,6 @@ void USBDevice::decodeSetupPacket(uint8_t *data, SETUP_PACKET *packet)
     packet->wLength = (data[6] | (uint16_t)data[7] << 8);
 }
 
-
 bool USBDevice::controlOut(void)
 {
     iprintf("{ControlOUT}");
@@ -343,11 +342,12 @@ bool USBDevice::requestSetAddress(void)
 
 bool USBDevice::requestSetConfiguration(void)
 {
-
     device.configuration = transfer.setup.wValue;
+    iprintf("SET CONFIGURATION: %d\n", transfer.setup.wValue);
     /* Set the device configuration */
     if (device.configuration == 0)
     {
+        iprintf("DECONFIGURED\n");
         /* Not configured */
         unconfigureDevice();
         device.state = ADDRESS;
@@ -356,12 +356,14 @@ bool USBDevice::requestSetConfiguration(void)
     {
         if (USBCallback_setConfiguration(device.configuration))
         {
+            iprintf("SET CONFIGURATION:SUCCESS!\n");
             /* Valid configuration */
             configureDevice();
             device.state = CONFIGURED;
         }
         else
         {
+            iprintf("SET CONFIGURATION:failure!\n");
             return false;
         }
     }
@@ -787,7 +789,8 @@ bool USBDevice::addRateFeedbackEndpoint(uint8_t endpoint, uint32_t maxPacket)
     return realiseEndpoint(endpoint, maxPacket, RATE_FEEDBACK_MODE);
 }
 
-int USBDevice::findDescriptorIndex(uint8_t descriptorType, uint8_t descriptorIndex) {
+int USBDevice::findDescriptorIndex(uint8_t start, uint8_t descriptorType, uint8_t descriptorIndex, uint8_t alternate)
+{
 //     uint8_t currentConfiguration = 0;
     uint8_t index = 0;
 
@@ -798,7 +801,7 @@ int USBDevice::findDescriptorIndex(uint8_t descriptorType, uint8_t descriptorInd
         return 1;
 
     int i;
-    for (i = 0; descriptors[i] != NULL; i++) {
+    for (i = start; descriptors[i] != NULL; i++) {
         if (descriptors[i]->bDescType == DT_CONFIGURATION) {
 //             usbdesc_configuration *conf = (usbdesc_configuration *) descriptors[i];
 //             currentConfiguration = conf->bConfigurationValue;
@@ -820,15 +823,32 @@ int USBDevice::findDescriptorIndex(uint8_t descriptorType, uint8_t descriptorInd
                 }
                 iprintf("FOUND %d:%d at %d, looking for %d\n", descriptorType, index, i, descriptorIndex);
                 if (index == descriptorIndex)
-                    return i;
+                {
+                    if (
+                        (descriptorType != DT_INTERFACE)
+                        ||
+                        (((usbdesc_interface *) descriptors[i])->bAlternateSetting == alternate)
+                       )
+                    {
+                        iprintf("Descriptor Found at %d!\n", i);
+                        return i;
+                    }
+                }
                 index++;
             }
 //         }
     }
+    iprintf("Descriptor not found\n");
     return -1;
 }
 
-uint8_t * USBDevice::findDescriptor(uint8_t descriptorType, uint8_t descriptorIndex) {
+int USBDevice::findDescriptorIndex(uint8_t descriptorType, uint8_t descriptorIndex)
+{
+    return findDescriptorIndex(0, descriptorType, descriptorIndex, 0);
+}
+
+uint8_t * USBDevice::findDescriptor(uint8_t descriptorType, uint8_t descriptorIndex)
+{
     int i = findDescriptorIndex(descriptorType, descriptorIndex);
     if (i >= 0)
         return (uint8_t *) descriptors[i];
@@ -845,12 +865,8 @@ uint8_t * USBDevice::findDescriptor(uint8_t descriptorType)
     return NULL;
 }
 
-// USBDevice::USBDevice(uint16_t vendor_id, uint16_t product_id, uint16_t product_release){
-//     VENDOR_ID = vendor_id;
-//     PRODUCT_ID = product_id;
-//     PRODUCT_RELEASE = product_release;
-
-USBDevice::USBDevice(){
+USBDevice::USBDevice()
+{
     device.state = POWERED;
     device.configuration = 0;
     device.suspended = false;
@@ -922,7 +938,7 @@ bool USBDevice::writeNB(uint8_t endpoint, uint8_t * buffer, uint32_t size, uint3
 
 
 
-bool USBDevice::readEP(uint8_t endpoint, uint8_t * buffer, uint32_t * size, uint32_t maxSize)
+bool USBDevice::readEP(uint8_t bEP, uint8_t * buffer, uint32_t * size, uint32_t maxSize)
 {
     EP_STATUS result;
 
@@ -932,7 +948,7 @@ bool USBDevice::readEP(uint8_t endpoint, uint8_t * buffer, uint32_t * size, uint
 
     /* Wait for completion */
     do {
-        result = endpointReadResult(endpoint, buffer, size);
+        result = endpointReadResult(bEP, buffer, size);
     } while ((result == EP_PENDING) && configured());
 
     return (result == EP_COMPLETED);
@@ -951,83 +967,3 @@ bool USBDevice::readEP_NB(uint8_t endpoint, uint8_t * buffer, uint32_t * size, u
 
     return (result == EP_COMPLETED);
 }
-
-
-
-// uint8_t * USBDevice::deviceDesc() {
-//     static uint8_t deviceDescriptor[] = {
-//         DEVICE_DESCRIPTOR_LENGTH,       /* bLength */
-//         DEVICE_DESCRIPTOR,              /* bDescriptorType */
-//         LSB(USB_VERSION_2_0),           /* bcdUSB (LSB) */
-//         MSB(USB_VERSION_2_0),           /* bcdUSB (MSB) */
-//         0x00,                           /* bDeviceClass */
-//         0x00,                           /* bDeviceSubClass */
-//         0x00,                           /* bDeviceprotocol */
-//         MAX_PACKET_SIZE_EP0,            /* bMaxPacketSize0 */
-//         LSB(VENDOR_ID),                 /* idVendor (LSB) */
-//         MSB(VENDOR_ID),                 /* idVendor (MSB) */
-//         LSB(PRODUCT_ID),                /* idProduct (LSB) */
-//         MSB(PRODUCT_ID),                /* idProduct (MSB) */
-//         LSB(PRODUCT_RELEASE),           /* bcdDevice (LSB) */
-//         MSB(PRODUCT_RELEASE),           /* bcdDevice (MSB) */
-//         STRING_OFFSET_IMANUFACTURER,    /* iManufacturer */
-//         STRING_OFFSET_IPRODUCT,         /* iProduct */
-//         STRING_OFFSET_ISERIAL,          /* iSerialNumber */
-//         0x01                            /* bNumConfigurations */
-//     };
-//     return deviceDescriptor;
-// }
-//
-// uint8_t * USBDevice::stringLangidDesc() {
-//     static uint8_t stringLangidDescriptor[] = {
-//         0x04,               /*bLength*/
-//         STRING_DESCRIPTOR,  /*bDescriptorType 0x03*/
-//         0x09,0x00,          /*bString Lang ID - 0x009 - English*/
-//     };
-//     return stringLangidDescriptor;
-// }
-//
-// uint8_t * USBDevice::stringImanufacturerDesc() {
-//     static uint8_t stringImanufacturerDescriptor[] = {
-//         0x12,                                            /*bLength*/
-//         STRING_DESCRIPTOR,                               /*bDescriptorType 0x03*/
-//         'm',0,'b',0,'e',0,'d',0,'.',0,'o',0,'r',0,'g',0, /*bString iManufacturer - mbed.org*/
-//     };
-//     return stringImanufacturerDescriptor;
-// }
-//
-// uint8_t * USBDevice::stringIserialDesc() {
-//     static uint8_t stringIserialDescriptor[] = {
-//         0x16,                                                           /*bLength*/
-//         STRING_DESCRIPTOR,                                              /*bDescriptorType 0x03*/
-//         '0',0,'1',0,'2',0,'3',0,'4',0,'5',0,'6',0,'7',0,'8',0,'9',0,    /*bString iSerial - 0123456789*/
-//     };
-//     return stringIserialDescriptor;
-// }
-//
-// uint8_t * USBDevice::stringIConfigurationDesc() {
-//     static uint8_t stringIconfigurationDescriptor[] = {
-//         0x06,               /*bLength*/
-//         STRING_DESCRIPTOR,  /*bDescriptorType 0x03*/
-//         '0',0,'1',0,        /*bString iConfiguration - 01*/
-//     };
-//     return stringIconfigurationDescriptor;
-// }
-//
-// uint8_t * USBDevice::stringIinterfaceDesc() {
-//     static uint8_t stringIinterfaceDescriptor[] = {
-//         0x08,               /*bLength*/
-//         STRING_DESCRIPTOR,  /*bDescriptorType 0x03*/
-//         'U',0,'S',0,'B',0,  /*bString iInterface - USB*/
-//     };
-//     return stringIinterfaceDescriptor;
-// }
-//
-// uint8_t * USBDevice::stringIproductDesc() {
-//     static uint8_t stringIproductDescriptor[] = {
-//         0x16,                                                       /*bLength*/
-//         STRING_DESCRIPTOR,                                          /*bDescriptorType 0x03*/
-//         'U',0,'S',0,'B',0,' ',0,'D',0,'E',0,'V',0,'I',0,'C',0,'E',0 /*bString iProduct - USB DEVICE*/
-//     };
-//     return stringIproductDescriptor;
-// }

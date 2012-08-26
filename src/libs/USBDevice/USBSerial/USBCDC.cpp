@@ -16,7 +16,9 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#include "stdint.h"
+#include <cstdint>
+#include <cstdio>
+
 #include "USBCDC.h"
 
 static uint8_t cdc_line_coding[7]= {0x80, 0x25, 0x00, 0x00, 0x00, 0x00, 0x08};
@@ -138,15 +140,18 @@ bool USBCDC::USBEvent_Request(CONTROL_TRANSFER &transfer) {
     if (transfer.setup.bmRequestType.Type == CLASS_TYPE) {
         switch (transfer.setup.bRequest) {
             case CDC_GET_LINE_CODING:
+                iprintf("[CDC]:GET_LINE_ENCODING\n");
                 transfer.remaining = 7;
                 transfer.ptr = cdc_line_coding;
                 transfer.direction = DEVICE_TO_HOST;
                 return true;
             case CDC_SET_LINE_CODING:
+                iprintf("[CDC]:SET_LINE_ENCODING\n");
                 transfer.remaining = 7;
                 transfer.ptr = cdc_line_coding;
                 return true;
             case CDC_SET_CONTROL_LINE_STATE:
+                iprintf("[CDC]:SET_CONTROL_LINE_STATE\n");
                 return true;
             default:
                 break;
@@ -161,26 +166,31 @@ bool USBCDC::USBEvent_RequestComplete(CONTROL_TRANSFER&, uint8_t*, uint32_t)
     return false;
 }
 
-#define EPINT_IN    CDC_intep.bEndpointAddress
-#define EPBULK_IN   CDC_BulkIn.bEndpointAddress
-#define EPBULK_OUT  CDC_BulkOut.bEndpointAddress
-
 bool USBCDC::send(uint8_t * buffer, uint32_t size) {
-    return usb->write(EPBULK_IN, buffer, size, CDC_BulkIn.wMaxPacketSize);
+    return usb->writeNB(CDC_BulkIn.bEndpointAddress, buffer, size, CDC_BulkIn.wMaxPacketSize);
 }
 
 bool USBCDC::readEP(uint8_t * buffer, uint32_t * size) {
-    if (!usb->readEP(EPBULK_OUT, buffer, size, CDC_BulkOut.wMaxPacketSize))
+    iprintf("USBCDC:readEP 0x%02X\n", CDC_BulkOut.bEndpointAddress);
+    if (!usb->readEP(CDC_BulkOut.bEndpointAddress, buffer, size, CDC_BulkOut.wMaxPacketSize))
+    {
+        iprintf("readEP failed\n");
         return false;
-    if (!usb->readStart(EPBULK_OUT, CDC_BulkOut.wMaxPacketSize))
+    }
+    iprintf("readEP ok\n");
+    if (!usb->readStart(CDC_BulkOut.bEndpointAddress, CDC_BulkOut.wMaxPacketSize))
+    {
+        iprintf("readStart failed\n");
         return false;
+    }
+    iprintf("readStart ok\n");
     return true;
 }
 
 bool USBCDC::readEP_NB(uint8_t * buffer, uint32_t * size) {
-    if (!usb->readEP_NB(EPBULK_OUT, buffer, size, CDC_BulkOut.wMaxPacketSize))
+    if (!usb->readEP_NB(CDC_BulkOut.bEndpointAddress, buffer, size, CDC_BulkOut.wMaxPacketSize))
         return false;
-    if (!usb->readStart(EPBULK_OUT, CDC_BulkOut.wMaxPacketSize))
+    if (!usb->readStart(CDC_BulkOut.bEndpointAddress, CDC_BulkOut.wMaxPacketSize))
         return false;
     return true;
 }

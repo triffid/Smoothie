@@ -35,7 +35,7 @@ public:
 
     int addDescriptor(usbdesc_base *descriptor);
     int addDescriptor(void *descriptor);
-    int findDescriptor(uint8_t start, uint8_t type, uint8_t index, uint8_t alternate);
+//     int findDescriptor(uint8_t start, uint8_t type, uint8_t index, uint8_t alternate);
     int addInterface(usbdesc_interface *);
     int addEndpoint(usbdesc_endpoint *);
     int addString(void *);

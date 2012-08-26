@@ -42,6 +42,10 @@
 // Convert physical endpoint number to register bit
 #define EP(endpoint) (1UL<<endpoint)
 
+#define ISOCHRONOUS_ENDPOINTS ((1UL << 3) | (1UL << 6) | (1UL << 9) | (1UL << 12))
+
+#define IS_ISOCHRONOUS(bEP) ((1UL << (bEP & 0x0F)) & ISOCHRONOUS_ENDPOINTS)
+
 // Power Control for Peripherals register
 #define PCUSB      (1UL<<31)
 
@@ -318,10 +322,28 @@ uint32_t USBHAL::endpointReadcore(uint8_t bEP, uint8_t *buffer) {
     uint8_t offset;
     uint8_t endpoint = EP2IDX(bEP);
 
+    iprintf("epReadCore 0x%02X = %d, 0x%02X\n", bEP, endpoint, LOG_ENDPOINT(endpoint));
+
     LPC_USB->USBCtrl = LOG_ENDPOINT(endpoint) | RD_EN;
-    while (!(LPC_USB->USBRxPLen & PKT_RDY));
+
+    iprintf("0x%02lX\n", LPC_USB->USBCtrl);
+
+    while (!(LPC_USB->USBRxPLen & PKT_RDY))
+    {
+        iprintf("ep not ready, Waiting for data...\n");
+    }
+
+    iprintf("0x%02lX 0x%02lX\n", LPC_USB->USBCtrl, LPC_USB->USBRxPLen);
 
     size = LPC_USB->USBRxPLen & PKT_LNGTH_MASK;
+
+    if ((IS_ISOCHRONOUS(bEP) == 0) && (size > 64))
+    {
+        iprintf("BOGUS SIZE FOR EP 0x%02X! Got %ld, max is 64!\n", bEP, size);
+        size = 64;
+    }
+
+    iprintf("Reading %ld bytes\n", size);
 
     offset = 0;
 
@@ -337,15 +359,18 @@ uint32_t USBHAL::endpointReadcore(uint8_t bEP, uint8_t *buffer) {
             buffer++;
 
             // move on to the next byte
-            offset = (offset + 8) % 32;
+            offset = (offset + 8) & 24;
         }
     } else {
         dummyRead = LPC_USB->USBRxData;
     }
 
+    iprintf("Read %ld\n", size);
+
     LPC_USB->USBCtrl = 0;
 
-    if ((endpoint >> 1) % 3 || (endpoint >> 1) == 0) {
+    if (IS_ISOCHRONOUS(bEP) == 0) {
+        iprintf("Buffer Clear 0x%02X\n", bEP);
         SIEselectEndpoint(bEP);
         if (SIEclearBuffer())
         {
@@ -369,39 +394,13 @@ static void endpointWritecore(uint8_t bEP, uint8_t *buffer, uint32_t size)
 //     offset = 0;
 //     data = 0;
     iprintf("EP%d%s(%d) W:", (endpoint >> 1), ((endpoint & 1)?"IN":"OUT"), endpoint);
-//     if (size > 0)
-//     {
-//         do
-//         {
-//             // Fetch next data byte into a word-sized temporary variable
-//             temp = *buffer++;
-//
-//             // Add to current data word
-//             temp = temp << offset;
-//             data = data | temp;
-//
-//             // move on to the next byte
-//             offset = (offset + 8) % 32;
-//             size--;
-//
-//             if ((offset==0) || (size==0))
-//             {
-//                 // Write the word to the endpoint
-//                 LPC_USB->USBTxData = data;
-//                 data = 0;
-//             }
-//         } while (size > 0);
-        while (LPC_USB->USBCtrl & WR_EN)
-        {
-            iprintf("0x%02X 0x%02X 0x%02X 0x%02X ", buffer[0], buffer[1], buffer[2], buffer[3]);
-            LPC_USB->USBTxData = (buffer[3] << 24) | (buffer[2] << 16) | (buffer[1] << 8) | buffer[0];
-            buffer += 4;
-        }
-//     }
-//     else
-//     {
-//         LPC_USB->USBTxData = 0;
-//     }
+    while (LPC_USB->USBCtrl & WR_EN)
+    {
+        iprintf("0x%02X 0x%02X 0x%02X 0x%02X ", buffer[0], buffer[1], buffer[2], buffer[3]);
+        LPC_USB->USBTxData = (buffer[3] << 24) | (buffer[2] << 16) | (buffer[1] << 8) | buffer[0];
+        buffer += 4;
+    }
+
     iprintf("!_(%ld)>", size);
 
     // Clear WR_EN to cover zero length packet case
@@ -410,12 +409,8 @@ static void endpointWritecore(uint8_t bEP, uint8_t *buffer, uint32_t size)
     SIEselectEndpoint(bEP);
     SIEvalidateBuffer();
 
-//     for (;;) {
-        uint8_t status = SIEselectEndpoint(bEP);
-        iprintf("EP 0x%02X ST 0x%02X\n", bEP, status);
-//         if ((status & 0x60) == 0)
-//             return;
-//     }
+    uint8_t status = SIEselectEndpoint(bEP);
+    iprintf("EP 0x%02X ST 0x%02X\n", bEP, status);
 }
 
 
@@ -555,14 +550,25 @@ EP_STATUS USBHAL::endpointReadResult(uint8_t bEP, uint8_t * buffer, uint32_t *by
 {
     uint8_t endpoint = EP2IDX(bEP);
 
+    iprintf("epReadResult 0x%02X = %d\n", bEP, endpoint);
+
     //for isochronous endpoint, we don't wait an interrupt
-    if ((endpoint >> 1) % 3 || (endpoint >> 1) == 0) {
+    if (IS_ISOCHRONOUS(bEP) == 0) {
+        iprintf("not Isochronous\n");
         if (!(epComplete & EP(endpoint)))
+        {
+            iprintf("Pending\n");
             return EP_PENDING;
+        }
     }
+
+    iprintf("reading...\n");
 
     *bytesRead = endpointReadcore(bEP, buffer);
     epComplete &= ~EP(endpoint);
+
+    iprintf("OK\n");
+
     return EP_COMPLETED;
 }
 
@@ -590,6 +596,19 @@ EP_STATUS USBHAL::endpointWriteResult(uint8_t bEP)
     }
 
     return EP_PENDING;
+}
+
+uint8_t USBHAL::endpointStatus(uint8_t bEP)
+{
+    uint8_t bEPStat = SIEselectEndpoint(EP2IDX(bEP));
+
+    uint8_t bStat = ((bEPStat & EPSTAT_FE ) ? EP_STATUS_DATA    : 0) |
+                    ((bEPStat & EPSTAT_ST ) ? EP_STATUS_STALLED : 0) |
+                    ((bEPStat & EPSTAT_STP) ? EP_STATUS_SETUP   : 0) |
+                    ((bEPStat & EPSTAT_EPN) ? EP_STATUS_NACKED  : 0) |
+                    ((bEPStat & EPSTAT_PO ) ? EP_STATUS_ERROR   : 0);
+
+    return bStat;
 }
 
 bool USBHAL::realiseEndpoint(uint8_t bEP, uint32_t maxPacket, uint32_t flags)
@@ -683,17 +702,18 @@ void USBHAL::usbisr(void) {
     if (LPC_USB->USBDevIntSt & FRAME) {
 //         iprintf("F");
         // Start of frame event
-        SOF(SIEgetFrameNumber());
+//         SOF(SIEgetFrameNumber());
+        USBEvent_Frame(SIEgetFrameNumber());
         // Clear interrupt status flag
         LPC_USB->USBDevIntClr = FRAME;
 
-        static uint8_t lst;
-        uint8_t st = SIEselectEndpoint(0x80);
-        if (st != lst)
-        {
-            iprintf("EP1S:%02X\n", st);
-            lst = st;
-        }
+//         static uint8_t lst;
+//         uint8_t st = SIEselectEndpoint(0x80);
+//         if (st != lst)
+//         {
+//             iprintf("EP1S:%02X\n", st);
+//             lst = st;
+//         }
     }
 
     if (LPC_USB->USBDevIntSt & DEV_STAT) {
@@ -724,7 +744,7 @@ void USBHAL::usbisr(void) {
             realiseEndpoint(IDX2EP(EP0IN), MAX_PACKET_SIZE_EP0, 0);
             realiseEndpoint(IDX2EP(EP0OUT), MAX_PACKET_SIZE_EP0, 0);
 
-            SIEsetMode(SIE_MODE_INAK_CI | SIE_MODE_INAK_CO);
+            SIEsetMode(SIE_MODE_INAK_CI | SIE_MODE_INAK_CO | SIE_MODE_INAK_BO);
         }
 
         if (devStat & SIE_DS_CON_CH) {
@@ -754,10 +774,11 @@ void USBHAL::usbisr(void) {
         }
 
         if (LPC_USB->USBEpIntSt & ~3) {
+            epComplete |= LPC_USB->USBEpIntSt;
             int i;
             uint32_t bitmask;
             for (i = 2, bitmask = 4; i < 32; i++, bitmask <<= 1) {
-                if (LPC_USB->USBEpIntSt & bitmask) {
+                if (epComplete & bitmask) {
                     uint8_t bEPStat = selectEndpointClearInterrupt(i);
                     uint8_t bStat = ((bEPStat & EPSTAT_FE ) ? EP_STATUS_DATA    : 0) |
                                     ((bEPStat & EPSTAT_ST ) ? EP_STATUS_STALLED : 0) |
@@ -766,14 +787,17 @@ void USBHAL::usbisr(void) {
                                     ((bEPStat & EPSTAT_PO ) ? EP_STATUS_ERROR   : 0);
                     if (IN_EP(i))
                     {
-                        iprintf("IN[%02X]", IDX2EP(i));
-                        USBEvent_EPIn(IDX2EP(i), bStat);
+                        iprintf("IN[%02X]\n", IDX2EP(i));
+                        if (USBEvent_EPIn(IDX2EP(i), bStat))
+                            epComplete &= ~bitmask;
                     }
                     else
                     {
-                        iprintf("OUT[%02X]", IDX2EP(i));
-                        USBEvent_EPOut(IDX2EP(i), bStat);
+                        iprintf("OUT[%02X]\n", IDX2EP(i));
+                        if (USBEvent_EPOut(IDX2EP(i), bStat))
+                            epComplete &= ~bitmask;
                     }
+                    LPC_USB->USBEpIntClr = (~epComplete) & bitmask;
                 }
             }
         }

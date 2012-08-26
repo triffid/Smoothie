@@ -114,22 +114,28 @@ void USB::init() {
 
 bool USB::USBCallback_setConfiguration(uint8_t configuration)
 {
-    int i = findDescriptor(0, DT_CONFIGURATION, configuration, 0);
+    iprintf("[CONFIGURE %d]", configuration);
+    int i = findDescriptorIndex(0, DT_CONFIGURATION, configuration, 0);
     if (i > 0)
     {
+        iprintf("[FOUND at %d]", i);
         uint8_t lastAlternate = 0;
+        i++;
         for (; descriptors[i] != (usbdesc_base *) 0 && descriptors[i]->bDescType != DT_CONFIGURATION; i++) {
             switch(descriptors[i]->bDescType)
             {
                 case DT_INTERFACE: {
                     usbdesc_interface *interface = (usbdesc_interface *) descriptors[i];
+                    iprintf("[INTERFACE %d:%d]",interface->bInterfaceNumber, interface->bAlternateSetting);
                     interface->selectedAlternate = 0;
                     lastAlternate = interface->bAlternateSetting;
                     break;
                 };
                 case DT_ENDPOINT: {
+                    usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
+                    iprintf("[EP 0x%02X](%d)", ep->bEndpointAddress, lastAlternate);
                     if (lastAlternate == 0) {
-                        usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
+                        iprintf("[Realised!]\n");
                         realiseEndpoint(ep->bEndpointAddress, ep->wMaxPacketSize, ((ep->bmAttributes & 3) == EA_ISOCHRONOUS)?ISOCHRONOUS:0);
                     }
                     break;
@@ -142,10 +148,10 @@ bool USB::USBCallback_setConfiguration(uint8_t configuration)
 }
 
 bool USB::USBCallback_setInterface(uint16_t interface, uint8_t alternate) {
-    int i = findDescriptor(0, DT_INTERFACE, interface, alternate);
+    int i = findDescriptorIndex(0, DT_INTERFACE, interface, alternate);
     if (i > 0)
     {
-        int j = findDescriptor(0, DT_INTERFACE, interface, 0);
+        int j = findDescriptorIndex(0, DT_INTERFACE, interface, 0);
         if (j > 0) {
             ((usbdesc_interface *) descriptors[j])->selectedAlternate = alternate;
             for (; (descriptors[i]->bDescType != DT_INTERFACE) && (descriptors[i]->bDescType != DT_CONFIGURATION); i++) {
@@ -199,32 +205,54 @@ bool USB::USBEvent_suspendStateChanged(bool suspended)
 
 bool USB::USBEvent_Request(CONTROL_TRANSFER& transfer)
 {
-    if ((transfer.setup.bmRequestType.Type == CLASS_TYPE) ||
-        (transfer.setup.bmRequestType.Type == VENDOR_TYPE))
+    if (transfer.setup.bmRequestType.Type == CLASS_TYPE)
+        iprintf("[CLASS]");
+    if (transfer.setup.bmRequestType.Type == VENDOR_TYPE)
+        iprintf("[VENDOR]");
+    if (
+        (transfer.setup.bmRequestType.Type == CLASS_TYPE)
+        ||
+        (transfer.setup.bmRequestType.Type == VENDOR_TYPE)
+       )
     {
         // decode request destination
         switch(transfer.setup.bmRequestType.Recipient)
         {
             case INTERFACE_RECIPIENT: {
-                int i = findDescriptor(0, DT_INTERFACE, transfer.setup.wIndex, 0);
+                iprintf("[INTERFACE %d]", transfer.setup.wIndex);
+                int i = findDescriptorIndex(0, DT_INTERFACE, transfer.setup.wIndex, 0);
                 if (i >.0)
                 {
                     usbdesc_interface *interface = (usbdesc_interface *) descriptors[i];
-                    return interface->classReceiver->USBEvent_Request(transfer);
+                    iprintf("[FOUND at %d, handler is %p]", i, interface->classReceiver);
+                    bool r = interface->classReceiver->USBEvent_Request(transfer);
+                    if (r)
+                        iprintf("[HANDLED]\n");
+                    else
+                        iprintf("[NOT handled]\n");
+                    return r;
                 }
                 break;
             };
             case ENDPOINT_RECIPIENT: {
-                int i = findDescriptor(0, DT_ENDPOINT, transfer.setup.wIndex, 0);
+                iprintf("[ENDPOINT 0x%02X]", transfer.setup.wIndex);
+                int i = findDescriptorIndex(0, DT_ENDPOINT, transfer.setup.wIndex, 0);
                 if (i >.0)
                 {
                     usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
-                    return ep->epReceiver->USBEvent_Request(transfer);
+                    iprintf("[FOUND at %d, handler is %p]", i, ep->epReceiver);
+                    bool r = ep->epReceiver->USBEvent_Request(transfer);
+                    if (r)
+                        iprintf("[HANDLED]\n");
+                    else
+                        iprintf("[NOT handled]\n");
+                    return r;
                 }
                 break;
             }
         }
     }
+//     iprintf("\n");
     return false;
 };
 
@@ -237,7 +265,7 @@ bool USB::USBEvent_RequestComplete(CONTROL_TRANSFER& transfer, uint8_t *buf, uin
         switch(transfer.setup.bmRequestType.Recipient)
         {
             case INTERFACE_RECIPIENT: {
-                int i = findDescriptor(0, DT_INTERFACE, transfer.setup.wIndex, 0);
+                int i = findDescriptorIndex(0, DT_INTERFACE, transfer.setup.wIndex, 0);
                 if (i >.0)
                 {
                     usbdesc_interface *interface = (usbdesc_interface *) descriptors[i];
@@ -246,7 +274,7 @@ bool USB::USBEvent_RequestComplete(CONTROL_TRANSFER& transfer, uint8_t *buf, uin
                 break;
             };
             case ENDPOINT_RECIPIENT: {
-                int i = findDescriptor(0, DT_ENDPOINT, transfer.setup.wIndex, 0);
+                int i = findDescriptorIndex(0, DT_ENDPOINT, transfer.setup.wIndex, 0);
                 if (i >.0)
                 {
                     usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
@@ -262,10 +290,11 @@ bool USB::USBEvent_RequestComplete(CONTROL_TRANSFER& transfer, uint8_t *buf, uin
 
 bool USB::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
 {
-    int i = findDescriptor(0, DT_ENDPOINT, bEP, 0);
+    int i = findDescriptorIndex(0, DT_ENDPOINT, bEP, 0);
     if (i > 0)
     {
         usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
+        iprintf("[EPIn 0x%02X ST 0x%02X Handler %p]", bEP, bEPStatus, ep->epReceiver);
         ep->epReceiver->USBEvent_EPIn(bEP, bEPStatus);
     }
     return false;
@@ -274,11 +303,14 @@ bool USB::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
 
 bool USB::USBEvent_EPOut(uint8_t bEP, uint8_t bEPStatus)
 {
-    int i = findDescriptor(0, DT_ENDPOINT, bEP, 0);
+    iprintf("[EPOut 0x%02X ST 0x%02X]\n", bEP, bEPStatus);
+    int i = findDescriptorIndex(0, DT_ENDPOINT, bEP, 0);
     if (i > 0)
     {
+        iprintf("[@%d ", i);
         usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
-        ep->epReceiver->USBEvent_EPOut(bEP, bEPStatus);
+        iprintf("Handler %p]\n", ep->epReceiver);
+        return ep->epReceiver->USBEvent_EPOut(bEP, bEPStatus);
     }
     return false;
 };
@@ -298,48 +330,6 @@ int USB::addDescriptor(usbdesc_base *descriptor) {
 int USB::addDescriptor(void *descriptor)
 {
 	return addDescriptor((usbdesc_base *) descriptor);
-}
-
-int USB::findDescriptor(uint8_t start, uint8_t type, uint8_t index, uint8_t alternate)
-{
-    int i;
-    int count = 0;
-    for (i = start; descriptors[i] != (usbdesc_base *) 0; i++) {
-        if (descriptors[i]->bDescType == type) {
-            // some descriptors have their own indexes, use if available
-            switch (descriptors[i]->bDescType)
-            {
-                case DT_CONFIGURATION:
-                    count = ((usbdesc_configuration *) descriptors[i])->bConfigurationValue;
-                    break;
-                case DT_INTERFACE:
-                    count = ((usbdesc_interface *) descriptors[i])->bInterfaceNumber;
-                    break;
-                case DT_ENDPOINT:
-                    count = ((usbdesc_endpoint *) descriptors[i])->bEndpointAddress;
-                    break;
-                default:
-                    break;
-            }
-            // if we've reached the specified descriptor
-            if (count == index) {
-                // and it's either the right alternate, or it's not an interface
-                if (
-                    (type != DT_INTERFACE)
-                    ||
-                    (((usbdesc_interface *) descriptors[i])->bAlternateSetting == alternate)
-                   )
-                {
-                    // return index into descriptors array
-                    return i;
-                }
-            }
-            // increase count
-            // for descriptors with their own indexes, this has no effect as the count is overwritten next time we loop
-            count++;
-        }
-    }
-    return -1;
 }
 
 int USB::addInterface(usbdesc_interface *ifp) {
