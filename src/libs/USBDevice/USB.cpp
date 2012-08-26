@@ -205,10 +205,10 @@ bool USB::USBEvent_suspendStateChanged(bool suspended)
 
 bool USB::USBEvent_Request(CONTROL_TRANSFER& transfer)
 {
-    if (transfer.setup.bmRequestType.Type == CLASS_TYPE)
+/*    if (transfer.setup.bmRequestType.Type == CLASS_TYPE)
         iprintf("[CLASS]");
     if (transfer.setup.bmRequestType.Type == VENDOR_TYPE)
-        iprintf("[VENDOR]");
+        iprintf("[VENDOR]")*/;
     if (
         (transfer.setup.bmRequestType.Type == CLASS_TYPE)
         ||
@@ -219,33 +219,33 @@ bool USB::USBEvent_Request(CONTROL_TRANSFER& transfer)
         switch(transfer.setup.bmRequestType.Recipient)
         {
             case INTERFACE_RECIPIENT: {
-                iprintf("[INTERFACE %d]", transfer.setup.wIndex);
+//                 iprintf("[INTERFACE %d]", transfer.setup.wIndex);
                 int i = findDescriptorIndex(0, DT_INTERFACE, transfer.setup.wIndex, 0);
                 if (i >.0)
                 {
                     usbdesc_interface *interface = (usbdesc_interface *) descriptors[i];
-                    iprintf("[FOUND at %d, handler is %p]", i, interface->classReceiver);
+//                     iprintf("[FOUND at %d, handler is %p]", i, interface->classReceiver);
                     bool r = interface->classReceiver->USBEvent_Request(transfer);
-                    if (r)
-                        iprintf("[HANDLED]\n");
-                    else
-                        iprintf("[NOT handled]\n");
+//                     if (r)
+//                         iprintf("[HANDLED]\n");
+//                     else
+//                         iprintf("[NOT handled]\n");
                     return r;
                 }
                 break;
             };
             case ENDPOINT_RECIPIENT: {
-                iprintf("[ENDPOINT 0x%02X]", transfer.setup.wIndex);
+//                 iprintf("[ENDPOINT 0x%02X]", transfer.setup.wIndex);
                 int i = findDescriptorIndex(0, DT_ENDPOINT, transfer.setup.wIndex, 0);
                 if (i >.0)
                 {
                     usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
-                    iprintf("[FOUND at %d, handler is %p]", i, ep->epReceiver);
+//                     iprintf("[FOUND at %d, handler is %p]", i, ep->epReceiver);
                     bool r = ep->epReceiver->USBEvent_Request(transfer);
-                    if (r)
-                        iprintf("[HANDLED]\n");
-                    else
-                        iprintf("[NOT handled]\n");
+//                     if (r)
+//                         iprintf("[HANDLED]\n");
+//                     else
+//                         iprintf("[NOT handled]\n");
                     return r;
                 }
                 break;

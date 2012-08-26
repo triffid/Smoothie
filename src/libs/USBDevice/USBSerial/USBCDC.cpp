@@ -171,19 +171,19 @@ bool USBCDC::send(uint8_t * buffer, uint32_t size) {
 }
 
 bool USBCDC::readEP(uint8_t * buffer, uint32_t * size) {
-    iprintf("USBCDC:readEP 0x%02X\n", CDC_BulkOut.bEndpointAddress);
+//     iprintf("USBCDC:readEP 0x%02X\n", CDC_BulkOut.bEndpointAddress);
     if (!usb->readEP(CDC_BulkOut.bEndpointAddress, buffer, size, CDC_BulkOut.wMaxPacketSize))
     {
-        iprintf("readEP failed\n");
+//         iprintf("readEP failed\n");
         return false;
     }
-    iprintf("readEP ok\n");
+//     iprintf("readEP ok\n");
     if (!usb->readStart(CDC_BulkOut.bEndpointAddress, CDC_BulkOut.wMaxPacketSize))
     {
-        iprintf("readStart failed\n");
+//         iprintf("readStart failed\n");
         return false;
     }
-    iprintf("readStart ok\n");
+//     iprintf("readStart ok\n");
     return true;
 }
 
