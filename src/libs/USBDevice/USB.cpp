@@ -295,7 +295,7 @@ bool USB::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
     {
         usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
 //         iprintf("[EPIn 0x%02X ST 0x%02X Handler %p]", bEP, bEPStatus, ep->epReceiver);
-        ep->epReceiver->USBEvent_EPIn(bEP, bEPStatus);
+        return ep->epReceiver->USBEvent_EPIn(bEP, bEPStatus);
     }
     return false;
 

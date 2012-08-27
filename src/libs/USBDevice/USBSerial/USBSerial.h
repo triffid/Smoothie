@@ -122,6 +122,8 @@ public:
 //         }
 //     }
 
+    CircBuffer<uint8_t> rxbuf;
+    CircBuffer<uint8_t> txbuf;
 
 protected:
 //     virtual bool EpCallback(uint8_t, uint8_t);
@@ -134,8 +136,6 @@ protected:
 private:
     USB *usb;
 //     mbed::FunctionPointer rx;
-    CircBuffer<uint8_t> rxbuf;
-    CircBuffer<uint8_t> txbuf;
 };
 
 #endif

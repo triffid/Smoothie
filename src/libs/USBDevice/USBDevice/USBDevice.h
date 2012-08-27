@@ -55,7 +55,7 @@ public:
     /*
      * get last frame number
      */
-    uint16_t lastFrame(void);
+//     uint16_t lastFrame(void);
 
     /*
     * Add an endpoint

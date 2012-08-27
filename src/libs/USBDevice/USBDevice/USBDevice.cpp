@@ -47,6 +47,8 @@
 
 #define iprintf(...)
 
+extern void setled(int, bool);
+
 bool USBDevice::setDescriptors(usbdesc_base ** newDescriptors)
 {
     if (configured() == false)
@@ -708,10 +710,10 @@ bool USBDevice::USBEvent_Frame(uint16_t Frame)
     return true;
 }
 
-uint16_t USBDevice::lastFrame()
-{
-    return lastFrameIndex;
-}
+// uint16_t USBDevice::lastFrame()
+// {
+//     return lastFrameIndex;
+// }
 
 void USBDevice::EP0setupCallback(void)
 {
@@ -904,9 +906,11 @@ bool USBDevice::write(uint8_t endpoint, uint8_t * buffer, uint32_t size, uint32_
     }
 
     /* Wait for completion */
+    setled(4, 1);
     do {
         result = endpointWriteResult(endpoint);
     } while ((result == EP_PENDING) && configured());
+    setled(4, 0);
 
     return (result == EP_COMPLETED);
 }
@@ -948,10 +952,12 @@ bool USBDevice::readEP(uint8_t bEP, uint8_t * buffer, uint32_t * size, uint32_t 
         return false;
     }
 
+    setled(4, 1);
     /* Wait for completion */
     do {
         result = endpointReadResult(bEP, buffer, size);
     } while ((result == EP_PENDING) && configured());
+    setled(4, 0);
 
     return (result == EP_COMPLETED);
 }

@@ -59,6 +59,12 @@ public:
     bool getEndpointStallState(uint8_t bEP);
     uint32_t endpointReadcore(uint8_t bEP, uint8_t *buffer);
 
+    uint16_t lastFrame(void);
+
+    bool endpointSetInterrupt(uint8_t bEP, bool enabled);
+    bool endpointGetInterrupt(uint8_t bEP);
+    void endpointTriggerInterrupt(uint8_t bEP);
+
     /* misc hardware stuff */
     uint32_t getSerialNumber(int length, uint32_t *buf);
 

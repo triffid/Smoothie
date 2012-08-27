@@ -49,11 +49,15 @@ public:
     }
 
     uint16_t available() {
-        return (write >= read) ? write - read : size - read + write;
+        return (write >= read) ? write - read : (size - read) + write;
     };
     uint16_t free() {
         return size - available();
     };
+
+    void dump() {
+        iprintf("[RingBuffer Sz:%2d Rd:%2d Wr:%2d Av:%2d Fr:%2d]\n", size, read, write, available(), free());
+    }
 
     bool dequeue(T * c) {
         bool empty = isEmpty();

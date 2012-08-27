@@ -21,7 +21,9 @@
 
 #include "USBSerial.h"
 
-#define iprintf(...)
+extern void setled(int, bool);
+
+// #define iprintf(...)
 
 USBSerial::USBSerial(USB *u): USBCDC(u), rxbuf(128), txbuf(128)
 {
@@ -33,19 +35,25 @@ int USBSerial::_putc(int c)
 //     send((uint8_t *)&c, 1);
     if (txbuf.free())
         txbuf.queue(c);
+
+    usb->endpointSetInterrupt(CDC_BulkIn.bEndpointAddress, true);
+    usb->endpointTriggerInterrupt(CDC_BulkIn.bEndpointAddress);
     return 1;
 }
 
 int USBSerial::_getc()
 {
     uint8_t c;
-    while (rxbuf.isEmpty());
+    setled(4, 1); while (rxbuf.isEmpty()); setled(4, 0);
     rxbuf.dequeue(&c);
     if (rxbuf.free() == MAX_PACKET_SIZE_EPBULK)
-        send(NULL, 0);
+    {
+        usb->endpointSetInterrupt(CDC_BulkOut.bEndpointAddress, true);
+        iprintf("rxbuf has room for another packet, interrupt enabled\n");
+        usb->endpointTriggerInterrupt(CDC_BulkOut.bEndpointAddress);
+    }
     return c;
 }
-
 
 bool USBSerial::writeBlock(uint8_t * buf, uint16_t size)
 {
@@ -65,7 +73,9 @@ bool USBSerial::writeBlock(uint8_t * buf, uint16_t size)
         {
             txbuf.queue(buf[i]);
         }
-        USBEvent_EPIn(CDC_BulkIn.bEndpointAddress, 0);
+        usb->endpointSetInterrupt(CDC_BulkIn.bEndpointAddress, true);
+        usb->endpointTriggerInterrupt(CDC_BulkIn.bEndpointAddress);
+//         USBEvent_EPIn(CDC_BulkIn.bEndpointAddress, 0);
     }
     return r;
 }
@@ -74,10 +84,10 @@ bool USBSerial::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
 {
     static bool needToSendNull = false;
 
-    iprintf("USBSerial:EpIn: 0x%02X\n", bEPStatus);
-
     if (bEP != CDC_BulkIn.bEndpointAddress)
         return false;
+
+    iprintf("USBSerial:EpIn: 0x%02X\n", bEPStatus);
 
     uint8_t b[MAX_PACKET_SIZE_EPBULK];
 
@@ -101,9 +111,13 @@ bool USBSerial::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
         if (l == 64 && txbuf.available() == 0)
             needToSendNull = true;
     }
-    else if (needToSendNull) {
-        send(NULL, 0);
-        needToSendNull = false;
+    else
+    {
+        if (needToSendNull) {
+            send(NULL, 0);
+            needToSendNull = false;
+        }
+        usb->endpointSetInterrupt(bEP, false);
     }
     iprintf("USBSerial:EpIn Complete\n");
     return true;
@@ -114,6 +128,12 @@ bool USBSerial::USBEvent_EPOut(uint8_t bEP, uint8_t bEPStatus)
     iprintf("USBSerial:EpOut\n");
     if (bEP != CDC_BulkOut.bEndpointAddress)
         return false;
+
+    if (rxbuf.free() < MAX_PACKET_SIZE_EPBULK)
+    {
+        usb->endpointSetInterrupt(bEP, false);
+        return false;
+    }
 
     uint8_t c[MAX_PACKET_SIZE_EPBULK];
     uint32_t size = 64;
@@ -129,16 +149,12 @@ bool USBSerial::USBEvent_EPOut(uint8_t bEP, uint8_t bEPStatus)
             iprintf("\\x%02X", c[i]);
     }
     iprintf("\nQueued, %d empty\n", rxbuf.free());
-//     if (rxbuf.free() >= MAX_PACKET_SIZE_EPBULK)
-//     {
-//         iprintf("Sent ack\n");
-//         send(NULL, 0);
-//     }
 
-    //call a potential handler
-//     rx.call();
+    if (rxbuf.free() < MAX_PACKET_SIZE_EPBULK)
+    {
+        usb->endpointSetInterrupt(bEP, false);
+    }
 
-    // We reactivate the endpoint to receive next characters
     usb->readStart(CDC_BulkOut.bEndpointAddress, MAX_PACKET_SIZE_EPBULK);
     iprintf("USBSerial:EpOut Complete\n");
     return true;

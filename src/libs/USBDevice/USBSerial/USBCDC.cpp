@@ -102,7 +102,7 @@ USBCDC::USBCDC(USB *u) {
         EP_DIR_IN,              // bEndpointAddress: we provide direction, address is filled in by addEndpoint()
         EA_BULK,                // bmAttributes
         MAX_PACKET_SIZE_EPBULK, // wMaxPacketSize
-        0,                      // bInterval
+        1,                      // bInterval
         0,                      // dummy padding
         this,                   // endpoint callback
     };
@@ -112,7 +112,7 @@ USBCDC::USBCDC(USB *u) {
         EP_DIR_OUT,             // bEndpointAddress: we provide direction, address is filled in by addEndpoint()
         EA_BULK,                // bmAttributes
         MAX_PACKET_SIZE_EPBULK, // wMaxPacketSize
-        0,                      // bInterval
+        1,                      // bInterval
         0,                      // dummy padding
         this,                   // endpoint callback
     };
