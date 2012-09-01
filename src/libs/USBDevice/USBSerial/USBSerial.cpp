@@ -37,7 +37,7 @@ int USBSerial::_putc(int c)
         txbuf.queue(c);
 
     usb->endpointSetInterrupt(CDC_BulkIn.bEndpointAddress, true);
-    usb->endpointTriggerInterrupt(CDC_BulkIn.bEndpointAddress);
+//     usb->endpointTriggerInterrupt(CDC_BulkIn.bEndpointAddress);
     return 1;
 }
 
@@ -50,22 +50,16 @@ int USBSerial::_getc()
     {
         usb->endpointSetInterrupt(CDC_BulkOut.bEndpointAddress, true);
         iprintf("rxbuf has room for another packet, interrupt enabled\n");
-        usb->endpointTriggerInterrupt(CDC_BulkOut.bEndpointAddress);
+//         usb->endpointTriggerInterrupt(CDC_BulkOut.bEndpointAddress);
     }
     return c;
 }
 
-bool USBSerial::writeBlock(uint8_t * buf, uint16_t size)
+uint16_t USBSerial::writeBlock(uint8_t * buf, uint16_t size)
 {
-    bool r = false;
-    if (size <= txbuf.free())
+    if (size > txbuf.free())
     {
-        r = true;
-    }
-    else
-    {
-        r = false;
-        size= txbuf.free();
+        size = txbuf.free();
     }
     if (size > 0)
     {
@@ -74,15 +68,17 @@ bool USBSerial::writeBlock(uint8_t * buf, uint16_t size)
             txbuf.queue(buf[i]);
         }
         usb->endpointSetInterrupt(CDC_BulkIn.bEndpointAddress, true);
-        usb->endpointTriggerInterrupt(CDC_BulkIn.bEndpointAddress);
+//         usb->endpointTriggerInterrupt(CDC_BulkIn.bEndpointAddress);
 //         USBEvent_EPIn(CDC_BulkIn.bEndpointAddress, 0);
     }
-    return r;
+    return size;
 }
 
 bool USBSerial::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
 {
     static bool needToSendNull = false;
+
+    bool r = true;
 
     if (bEP != CDC_BulkIn.bEndpointAddress)
         return false;
@@ -93,7 +89,8 @@ bool USBSerial::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
 
     int l = txbuf.available();
     iprintf("%d bytes queued\n", l);
-    if (l > 0) {
+    if (l > 0)
+    {
         if (l > MAX_PACKET_SIZE_EPBULK)
             l = MAX_PACKET_SIZE_EPBULK;
         iprintf("Sending %d bytes:\n\t", l);
@@ -113,14 +110,19 @@ bool USBSerial::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus)
     }
     else
     {
-        if (needToSendNull) {
+        if (needToSendNull)
+        {
             send(NULL, 0);
             needToSendNull = false;
         }
-        usb->endpointSetInterrupt(bEP, false);
+        else
+        {
+            r = false;
+        }
+//         usb->endpointSetInterrupt(bEP, false);
     }
     iprintf("USBSerial:EpIn Complete\n");
-    return true;
+    return r;
 }
 
 bool USBSerial::USBEvent_EPOut(uint8_t bEP, uint8_t bEPStatus)

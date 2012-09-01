@@ -94,9 +94,9 @@ public:
     * @param buf pointer on data which will be written
     * @param size size of the buffer. The maximum size of a block is limited by the size of the endpoint (64 bytes)
     *
-    * @returns true if successfull
+    * @returns number of bytes successfully buffered
     */
-    bool writeBlock(uint8_t * buf, uint16_t size);
+    uint16_t writeBlock(uint8_t * buf, uint16_t size);
 
     /**
      *  Attach a member function to call when a packet is received.

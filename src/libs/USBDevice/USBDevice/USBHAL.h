@@ -70,6 +70,8 @@ public:
 
     static void _usbisr(void);
 
+    volatile uint32_t USBEpIntEn;
+
 protected:
     /* callbacks */
     //     virtual bool USB_Frame_Callback(uint16_t);

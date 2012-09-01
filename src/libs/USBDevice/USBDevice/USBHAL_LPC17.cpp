@@ -168,7 +168,7 @@
 
 USBHAL * USBHAL::instance;
 
-volatile int epComplete;
+volatile uint32_t epComplete;
 uint32_t endpointStallState;
 
 extern void setled(int, bool);
@@ -431,11 +431,6 @@ static void endpointWritecore(uint8_t bEP, uint8_t *buffer, uint32_t size)
 }
 
 
-
-
-
-
-
 USBHAL::USBHAL(void) {
     instance = this;
 }
@@ -473,6 +468,8 @@ void USBHAL::init() {
 //     instance = this;
     //     NVIC_SetVector(USB_IRQn, (uint32_t)&_usbisr);
     //     NVIC_EnableIRQ(USB_IRQn);
+
+    USBEpIntEn = 0x3;
 
     // Enable interrupts for device events and EP0
 //     LPC_USB->USBDevIntEn = EP_SLOW | DEV_STAT | FRAME;
@@ -532,7 +529,8 @@ void USBHAL::unconfigureDevice(void) {
 
 void USBHAL::setAddress(uint8_t address) {
     SIEsetAddress(address);
-    SIEsetMode(SIE_MODE_INAK_CI | SIE_MODE_INAK_CO | SIE_MODE_INAK_BI | SIE_MODE_INAK_BO);
+//     SIEsetMode(SIE_MODE_INAK_CI | SIE_MODE_INAK_CO | SIE_MODE_INAK_BI | SIE_MODE_INAK_BO);
+    SIEsetMode(SIE_MODE_INAK_CI | SIE_MODE_INAK_CO);
 }
 
 void USBHAL::EP0setup(uint8_t *buffer) {
@@ -648,6 +646,23 @@ bool USBHAL::realiseEndpoint(uint8_t bEP, uint32_t maxPacket, uint32_t flags)
 
     enableEndpointEvent(bEP);
 
+    /*
+     * if this is an OUT endpoint, enable interrupts so we can receive any
+     *   data the host sends to us.
+     *
+     * if this is an IN endpoint, don't enable interrupts just yet, but have
+     *   an event waiting so we can immediately interrupt later on when the
+     *   user app calls endpointSetInterrupt(bEP, true)
+    */
+    if (IN_BEP(bEP))
+    {
+        epComplete |= EP(endpoint);
+    }
+    else
+    {
+        endpointSetInterrupt(bEP, true);
+    }
+
     iprintf("EP 0x%02X realised @%ld!\n", bEP, maxPacket);
     return true;
 }
@@ -718,12 +733,20 @@ bool USBHAL::endpointSetInterrupt(uint8_t bEP, bool enabled)
 {
     uint8_t endpoint = EP2IDX(bEP);
 
-    bool r = LPC_USB->USBEpIntEn | EP(endpoint);
+    bool r = USBEpIntEn | EP(endpoint);
 
     if (enabled)
-        LPC_USB->USBEpIntEn |= EP(endpoint);
+    {
+        __disable_irq();
+        USBEpIntEn |= EP(endpoint);
+        if (epComplete & EP(endpoint))
+            LPC_USB->USBEpIntSet = EP(endpoint);
+        __enable_irq();
+    }
     else
-        LPC_USB->USBEpIntEn &= ~EP(endpoint);
+    {
+        USBEpIntEn &= ~EP(endpoint);
+    }
 
     return r;
 }
@@ -732,39 +755,25 @@ bool USBHAL::endpointGetInterrupt(uint8_t bEP)
 {
     uint8_t endpoint = EP2IDX(bEP);
 
-    return LPC_USB->USBEpIntEn | EP(endpoint);
+    return USBEpIntEn | EP(endpoint);
 }
 
 void USBHAL::endpointTriggerInterrupt(uint8_t bEP)
 {
     uint8_t endpoint = EP2IDX(bEP);
 
-//     uint8_t bEPStatus = SIEselectEndpoint(bEP);
-
-//     bool canforce = false;
-
-//     if (IN_BEP(bEP))
-//     {
-//         canforce = ((bEPStatus & EPSTAT_FE) == 0);
-//     }
-//     else
-//     {
-//         canforce = ((bEPStatus & (EPSTAT_B1FULL | EPSTAT_B2FULL)) != (EPSTAT_B1FULL | EPSTAT_B2FULL));
-//     }
-
-//     if (canforce)
-//     {
-        LPC_USB->USBEpIntSet = EP(endpoint);
-//     }
+    LPC_USB->USBEpIntSet = EP(endpoint);
 }
 
-void USBHAL::usbisr(void) {
+void USBHAL::usbisr(void)
+{
     uint8_t devStat;
 
 //     iprintf("!");
     //     dbg.send("!", 1);
 
-    if (LPC_USB->USBDevIntSt & FRAME) {
+    if (LPC_USB->USBDevIntSt & FRAME)
+    {
 //         iprintf("F");
         // Start of frame event
 //         SOF(SIEgetFrameNumber());
@@ -781,7 +790,8 @@ void USBHAL::usbisr(void) {
 //         }
     }
 
-    if (LPC_USB->USBDevIntSt & DEV_STAT) {
+    if (LPC_USB->USBDevIntSt & DEV_STAT)
+    {
         iprintf("D");
         // Device Status interrupt
         // Must clear the interrupt status flag before reading the device status from the SIE
@@ -791,7 +801,8 @@ void USBHAL::usbisr(void) {
         devStat = SIEgetDeviceStatus();
         //printf("devStat: %d\r\n", devStat);
 
-        if (devStat & SIE_DS_SUS_CH) {
+        if (devStat & SIE_DS_SUS_CH)
+        {
             // Suspend status changed
 //             if((devStat & SIE_DS_SUS) != 0) {
 //                 USBEvent_suspendStateChanged(false);
@@ -799,7 +810,8 @@ void USBHAL::usbisr(void) {
             USBEvent_suspendStateChanged(devStat & SIE_DS_SUS);
         }
 
-        if (devStat & SIE_DS_RST) {
+        if (devStat & SIE_DS_RST)
+        {
             // Bus reset
 //             if((devStat & SIE_DS_SUS) == 0) {
 //                 USBEvent_suspendStateChanged(true);
@@ -812,73 +824,83 @@ void USBHAL::usbisr(void) {
             SIEsetMode(SIE_MODE_INAK_CI | SIE_MODE_INAK_CO | SIE_MODE_INAK_BI | SIE_MODE_INAK_BO);
         }
 
-        if (devStat & SIE_DS_CON_CH) {
+        if (devStat & SIE_DS_CON_CH)
+        {
             USBEvent_connectStateChanged(devStat & SIE_DS_CON);
         }
     }
 
-    if (LPC_USB->USBDevIntSt & EP_SLOW) {
+    if (LPC_USB->USBDevIntSt & EP_SLOW)
+    {
         iprintf("E:0x%08lX>", LPC_USB->USBEpIntSt);
         // (Slow) Endpoint Interrupt
 
         // Process each endpoint interrupt
-        if (LPC_USB->USBEpIntSt & EP(EP0OUT)) {
-            if (selectEndpointClearInterrupt(IDX2EP(EP0OUT)) & SIE_SE_STP) {
+        if (LPC_USB->USBEpIntSt & EP(EP0OUT))
+        {
+            if (selectEndpointClearInterrupt(IDX2EP(EP0OUT)) & SIE_SE_STP)
+            {
                 // this is a setup packet
                 iprintf("SETUP");
                 EP0setupCallback();
-            } else {
+            }
+            else
+            {
                 iprintf("OUT[%02X]", IDX2EP(EP0OUT));
                 EP0out();
             }
         }
-        if (LPC_USB->USBEpIntSt & EP(EP0IN)) {
-            iprintf("IN[%02X]", IDX2EP(EP0IN));
+        if (LPC_USB->USBEpIntSt & EP(EP0IN))
+        {
             selectEndpointClearInterrupt(IDX2EP(EP0IN));
+            iprintf("IN[%02X]", IDX2EP(EP0IN));
             EP0in();
         }
 
-        if (LPC_USB->USBEpIntSt & ~3) {
-            epComplete |= LPC_USB->USBEpIntSt;
+        if (LPC_USB->USBEpIntSt & ~(3UL))
+        {
             int i;
             uint32_t bitmask;
-            for (i = 2, bitmask = 4; i < 32; i++, bitmask <<= 1) {
-                if (epComplete & bitmask) {
-//                     uint8_t bEPStat = selectEndpointClearInterrupt(IDX2EP(i));
-                    uint8_t bEPStat = SIEselectEndpoint(IDX2EP(i));
-                    uint8_t bStat = ((bEPStat & EPSTAT_FE ) ? EP_STATUS_DATA    : 0) |
-                                    ((bEPStat & EPSTAT_ST ) ? EP_STATUS_STALLED : 0) |
-                                    ((bEPStat & EPSTAT_STP) ? EP_STATUS_SETUP   : 0) |
-                                    ((bEPStat & EPSTAT_EPN) ? EP_STATUS_NACKED  : 0) |
-                                    ((bEPStat & EPSTAT_PO ) ? EP_STATUS_ERROR   : 0);
-                    if (IN_EP(i))
+
+            epComplete |= LPC_USB->USBEpIntSt;
+
+            for (i = 2, bitmask = 4; i < 32; i++, bitmask <<= 1)
+            {
+                if (LPC_USB->USBEpIntSt & bitmask)
+                {
+                    uint8_t bEPStat = selectEndpointClearInterrupt(IDX2EP(i));
+
+                    if ((USBEpIntEn & bitmask) && (epComplete & bitmask))
                     {
-                        iprintf("IN[%02X]:", IDX2EP(i));
-                        if (USBEvent_EPIn(IDX2EP(i), bStat))
+
+                        uint8_t bStat = ((bEPStat & EPSTAT_FE ) ? EP_STATUS_DATA    : 0) |
+                                        ((bEPStat & EPSTAT_ST ) ? EP_STATUS_STALLED : 0) |
+                                        ((bEPStat & EPSTAT_STP) ? EP_STATUS_SETUP   : 0) |
+                                        ((bEPStat & EPSTAT_EPN) ? EP_STATUS_NACKED  : 0) |
+                                        ((bEPStat & EPSTAT_PO ) ? EP_STATUS_ERROR   : 0);
+
+                        bool r;
+
+                        if (IN_EP(i))
                         {
-                            selectEndpointClearInterrupt(IDX2EP(i));
+                            iprintf("IN[%02X]:", IDX2EP(i));
+                            r = USBEvent_EPIn(IDX2EP(i), bStat);
+                        }
+                        else
+                        {
+                            iprintf("OUT[%02X]:", IDX2EP(i));
+                            r = USBEvent_EPOut(IDX2EP(i), bStat);
+                        }
+
+                        if (r)
+                        {
+                            //                             selectEndpointClearInterrupt(IDX2EP(i));
                             epComplete &= ~bitmask;
                             iprintf("True");
                         }
                         else
                         {
-                            endpointSetInterrupt(IDX2EP(i), false);
-                            iprintf("False");
-                        }
-                        iprintf("\n");
-                    }
-                    else
-                    {
-                        iprintf("OUT[%02X]:", IDX2EP(i));
-                        if (USBEvent_EPOut(IDX2EP(i), bStat))
-                        {
-                            selectEndpointClearInterrupt(IDX2EP(i));
-                            epComplete &= ~bitmask;
-                            iprintf("True");
-                        }
-                        else
-                        {
-                            endpointSetInterrupt(IDX2EP(i), false);
+                            USBEpIntEn &= ~bitmask;
                             iprintf("False");
                         }
                         iprintf("\n");
