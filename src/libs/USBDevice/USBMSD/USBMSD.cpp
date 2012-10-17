@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <cstring>
+#include <cstdio>
 
 #include "USBMSD.h"
 
@@ -123,22 +124,24 @@ USBMSD::USBMSD(USB *u, MSD_Disk *d) {
 
 
 // Called in ISR context to process a class specific request
-bool USBMSD::USBCallback_request(CONTROL_TRANSFER *transfer) {
+bool USBMSD::USBEvent_Request(CONTROL_TRANSFER &transfer) {
 
     bool success = false;
 //     CONTROL_TRANSFER * transfer = getTransferPtr();
     static uint8_t maxLUN[1] = {0};
 
-    if (transfer->setup.bmRequestType.Type == CLASS_TYPE) {
-        switch (transfer->setup.bRequest) {
+    if (transfer.setup.bmRequestType.Type == CLASS_TYPE) {
+        switch (transfer.setup.bRequest) {
             case MSC_REQUEST_RESET:
+                iprintf("MSC:Req Reset\n");
                 reset();
                 success = true;
                 break;
             case MSC_REQUEST_GET_MAX_LUN:
-                transfer->remaining = 1;
-                transfer->ptr = maxLUN;
-                transfer->direction = DEVICE_TO_HOST;
+                iprintf("MSC:Req Get_Max_Lun\n");
+                transfer.remaining = 1;
+                transfer.ptr = maxLUN;
+                transfer.direction = DEVICE_TO_HOST;
                 success = true;
                 break;
             default:
@@ -149,21 +152,25 @@ bool USBMSD::USBCallback_request(CONTROL_TRANSFER *transfer) {
     return success;
 }
 
+bool USBMSD::USBEvent_RequestComplete(CONTROL_TRANSFER &transfer, uint8_t *buf, uint32_t length)
+{
+    return true;
+}
 
-bool USBMSD::connect() {
-
+bool USBMSD::connect()
+{
     //disk initialization
-    if (disk_status() & NO_INIT) {
-        if (disk_initialize()) {
+    if (disk->disk_status() & NO_INIT) {
+        if (disk->disk_initialize()) {
             return false;
         }
     }
 
     // get number of blocks
-    BlockCount = disk_sectors();
+    BlockCount = disk->disk_sectors();
 
     // get memory size
-    MemorySize = disk_size();
+    MemorySize = disk->disk_size();
 
     if (BlockCount >= 0) {
         BlockSize = MemorySize / BlockCount;
@@ -188,10 +195,12 @@ void USBMSD::reset() {
 
 
 // Called in ISR context called when a data is received
-bool USBMSD::EP2_OUT_callback() {
+// bool USBMSD::EP2_OUT_callback() {
+bool USBMSD::USBEvent_EPOut(uint8_t bEP, uint8_t bEPStatus) {
     uint32_t size = 0;
 //     uint8_t buf[MAX_PACKET_SIZE_EPBULK];
     usb->readEP(MSC_BulkOut.bEndpointAddress, buffer, &size, MAX_PACKET_SIZE_EPBULK);
+    iprintf("MSD:EPOut:Read %lu\n", size);
     switch (stage) {
             // the device has to decode the CBW received
         case READ_CBW:
@@ -225,11 +234,14 @@ bool USBMSD::EP2_OUT_callback() {
 }
 
 // Called in ISR context when a data has been transferred
-bool USBMSD::EP2_IN_callback() {
+// bool USBMSD::EP2_IN_callback() {
+bool USBMSD::USBEvent_EPIn(uint8_t bEP, uint8_t bEPStatus) {
+//     iprintf("MSD:EPIn:Stage %d\n", stage);
+    iprintf("!");
     switch (stage) {
         // not sure
         case READ_CBW:
-            break;
+            return false;
 
         // the device has to send data to the host
         case PROCESS_CBW:
@@ -237,29 +249,28 @@ bool USBMSD::EP2_IN_callback() {
                 case READ10:
                 case READ12:
                     memoryRead();
-                    break;
+                    return true;
             }
-            break;
+            return false;
 
         //the device has to send a CSW
         case SEND_CSW:
             sendCSW();
-            break;
+            return true;
 
         // an error has occured
         case ERROR:
             usb->stallEndpoint(MSC_BulkIn.bEndpointAddress);
             sendCSW();
-            break;
+            return true;
 
         // the host has received the CSW -> we wait a CBW
         case WAIT_CSW:
             stage = READ_CBW;
-            break;
+            return false;
     }
-    return true;
+    return false;
 }
-
 
 void USBMSD::memoryWrite (uint8_t * buf, uint16_t size) {
 
@@ -275,8 +286,8 @@ void USBMSD::memoryWrite (uint8_t * buf, uint16_t size) {
 
     // if the array is filled, write it in memory
     if (!((addr + size)%BlockSize)) {
-        if (!(disk_status() & WRITE_PROTECT)) {
-            disk_write((const char *)page, addr/BlockSize);
+        if (!(disk->disk_status() & WRITE_PROTECT)) {
+            disk->disk_write((const char *)page, addr/BlockSize);
         }
     }
 
@@ -300,8 +311,8 @@ void USBMSD::memoryVerify (uint8_t * buf, uint16_t size) {
     }
 
     // beginning of a new block -> load a whole block in RAM
-    if (!(addr%BlockSize))
-        disk_read((char *)page, addr/BlockSize);
+    if (!(addr % BlockSize))
+        disk->disk_read((char *)page, addr/BlockSize);
 
     // info are in RAM -> no need to re-read memory
     for (n = 0; n < size; n++) {
@@ -374,18 +385,24 @@ bool USBMSD::readCapacity (void) {
 }
 
 bool USBMSD::write (uint8_t * buf, uint16_t size) {
-
     if (size >= cbw.DataLength) {
         size = cbw.DataLength;
     }
     stage = SEND_CSW;
 
+    iprintf("MSD:write: %u bytes\n", size);
+
     if (!usb->writeNB(MSC_BulkIn.bEndpointAddress, buf, size, MAX_PACKET_SIZE_EPBULK)) {
         return false;
     }
 
+    iprintf("MSD:write OK, sending CSW\n");
+
     csw.DataResidue -= size;
     csw.Status = CSW_PASSED;
+
+    usb->endpointSetInterrupt(MSC_BulkIn.bEndpointAddress, true);
+
     return true;
 }
 
@@ -400,8 +417,10 @@ bool USBMSD::modeSense6 (void) {
 
 void USBMSD::sendCSW() {
     csw.Signature = CSW_Signature;
+    iprintf("MSD:SendCSW:\n\tSignature : %lu\n\tTag       : %lu\n\tDataResidue: %lu\n\tStatus     : %u\n", csw.Signature, csw.Tag, csw.DataResidue, csw.Status);
     usb->writeNB(MSC_BulkIn.bEndpointAddress, (uint8_t *)&csw, sizeof(CSW), MAX_PACKET_SIZE_EPBULK);
     stage = WAIT_CSW;
+    usb->endpointSetInterrupt(MSC_BulkIn.bEndpointAddress, true);
 }
 
 bool USBMSD::requestSense (void) {
@@ -448,6 +467,7 @@ void USBMSD::CBWDecode(uint8_t * buf, uint16_t size) {
             if ((cbw.CBLength <  1) || (cbw.CBLength > 16) ) {
                 fail();
             } else {
+                iprintf("MSD:Got CBW %d\n", cbw.CB[0]);
                 switch (cbw.CB[0]) {
                     case TEST_UNIT_READY:
                         testUnitReady();
@@ -469,6 +489,7 @@ void USBMSD::CBWDecode(uint8_t * buf, uint16_t size) {
                         break;
                     case READ10:
                     case READ12:
+                        iprintf("MSD:READ10\n");
                         if (infoTransfer()) {
                             if ((cbw.Flags & 0x80)) {
                                 stage = PROCESS_CBW;
@@ -544,8 +565,8 @@ void USBMSD::memoryRead (void) {
     }
 
     // we read an entire block
-    if (!(addr%BlockSize))
-        disk_read((char *)page, addr/BlockSize);
+    if (!(addr % BlockSize))
+        disk->disk_read((char *)page, addr/BlockSize);
 
     // write data which are in RAM
     usb->writeNB(MSC_BulkIn.bEndpointAddress, &page[addr%BlockSize], n, MAX_PACKET_SIZE_EPBULK);
@@ -558,7 +579,11 @@ void USBMSD::memoryRead (void) {
     if ( !length || (stage != PROCESS_CBW)) {
         csw.Status = (stage == PROCESS_CBW) ? CSW_PASSED : CSW_FAILED;
         stage = (stage == PROCESS_CBW) ? SEND_CSW : stage;
+        iprintf("MSD:Read Complete\n");
     }
+//     else {
+        usb->endpointSetInterrupt(MSC_BulkIn.bEndpointAddress, true);
+//     }
 }
 
 
@@ -604,6 +629,8 @@ bool USBMSD::infoTransfer (void) {
         return false;
     }
 
+    iprintf("MSD:infoTransfer OK, transferring %lu blocks starting at block #%lu\n", n, addr / BlockSize);
+
     return true;
 }
 
@@ -614,15 +641,15 @@ bool USBMSD::infoTransfer (void) {
 // Called in ISR context
 // Set configuration. Return false if the
 // configuration is not supported.
-bool USBMSD::USBCallback_setConfiguration(uint8_t configuration) {
-    if (configuration != DEFAULT_CONFIGURATION) {
-        return false;
-    }
-
-    //activate readings
-    usb->readStart(MSC_BulkOut.bEndpointAddress, MAX_PACKET_SIZE_EPBULK);
-    return true;
-}
+// bool USBMSD::USBCallback_setConfiguration(uint8_t configuration) {
+//     if (configuration != DEFAULT_CONFIGURATION) {
+//         return false;
+//     }
+//
+//     //activate readings
+//     usb->readStart(MSC_BulkOut.bEndpointAddress, MAX_PACKET_SIZE_EPBULK);
+//     return true;
+// }
 
 
 // uint8_t * USBMSD::stringIinterfaceDesc() {

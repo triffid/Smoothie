@@ -29,52 +29,7 @@
 
 #include "USBDevice.h"
 
-class MSD_Disk {
-    /*
-     * read a block on a storage chip
-     *
-     * @param data pointer where will be stored read data
-     * @param block block number
-     * @returns 0 if successful
-     */
-    virtual int disk_read(char * data, int block) = 0;
-
-    /*
-     * write a block on a storage chip
-     *
-     * @param data data to write
-     * @param block block number
-     * @returns 0 if successful
-     */
-    virtual int disk_write(const char * data, int block) = 0;
-
-    /*
-     * Disk initilization
-     */
-    virtual int disk_initialize() = 0;
-
-    /*
-     * Return the number of blocks
-     *
-     * @returns number of blocks
-     */
-    virtual int disk_sectors() = 0;
-
-    /*
-     * Return memory size
-     *
-     * @returns memory size
-     */
-    virtual int disk_size() = 0;
-
-
-    /*
-     * To check the status of the storage chip
-     *
-     * @returns status: 0: OK, 1: disk not initialized, 2: no medium in the drive, 4: write protected
-     */
-    virtual int disk_status() = 0;
-};
+#include "disk.h"
 
 /**
  * USBMSD class: generic class in order to use all kinds of blocks storage chip
@@ -123,6 +78,10 @@ public:
     */
     bool connect();
 
+    bool USBEvent_Request(CONTROL_TRANSFER&);
+    bool USBEvent_RequestComplete(CONTROL_TRANSFER&, uint8_t *, uint32_t);
+    bool USBEvent_EPIn(uint8_t, uint8_t);
+    bool USBEvent_EPOut(uint8_t, uint8_t);
 
 protected:
 
@@ -133,7 +92,7 @@ protected:
     * @param block block number
     * @returns 0 if successful
     */
-    virtual int disk_read(char * data, int block) = 0;
+//     virtual int disk_read(char * data, int block) = 0;
 
     /*
     * write a block on a storage chip
@@ -142,26 +101,26 @@ protected:
     * @param block block number
     * @returns 0 if successful
     */
-    virtual int disk_write(const char * data, int block) = 0;
+//     virtual int disk_write(const char * data, int block) = 0;
 
     /*
     * Disk initilization
     */
-    virtual int disk_initialize() = 0;
+//     virtual int disk_initialize() = 0;
 
     /*
     * Return the number of blocks
     *
     * @returns number of blocks
     */
-    virtual int disk_sectors() = 0;
+//     virtual int disk_sectors() = 0;
 
     /*
     * Return memory size
     *
     * @returns memory size
     */
-    virtual int disk_size() = 0;
+//     virtual int disk_size() = 0;
 
 
     /*
@@ -169,48 +128,48 @@ protected:
     *
     * @returns status: 0: OK, 1: disk not initialized, 2: no medium in the drive, 4: write protected
     */
-    virtual int disk_status() = 0;
+//     virtual int disk_status() = 0;
 
     /*
     * Get string product descriptor
     *
     * @returns pointer to the string product descriptor
     */
-    virtual uint8_t * stringIproductDesc();
+//     virtual uint8_t * stringIproductDesc();
 
     /*
     * Get string interface descriptor
     *
     * @returns pointer to the string interface descriptor
     */
-    virtual uint8_t * stringIinterfaceDesc();
+//     virtual uint8_t * stringIinterfaceDesc();
 
     /*
     * Get configuration descriptor
     *
     * @returns pointer to the configuration descriptor
     */
-    virtual uint8_t * configurationDesc();
+//     virtual uint8_t * configurationDesc();
 
     /*
     * Callback called when a packet is received
     */
-    virtual bool EP2_OUT_callback();
+//     virtual bool EP2_OUT_callback();
 
     /*
     * Callback called when a packet has been sent
     */
-    virtual bool EP2_IN_callback();
+//     virtual bool EP2_IN_callback();
 
     /*
     * Set configuration of device. Add endpoints
     */
-    virtual bool USBCallback_setConfiguration(uint8_t configuration);
+//     virtual bool USBCallback_setConfiguration(uint8_t configuration);
 
     /*
     * Callback called to process class specific requests
     */
-    virtual bool USBCallback_request(CONTROL_TRANSFER *);
+//     virtual bool USBCallback_request(CONTROL_TRANSFER *);
 
 
 private:

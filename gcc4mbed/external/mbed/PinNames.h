@@ -13,7 +13,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif 
+#endif
 
 enum PinName {
 
@@ -40,15 +40,15 @@ enum PinName {
       , P4_24, P4_25, P4_26, P4_27, P4_28, P4_29, P4_30, P4_31
 
     // mbed DIP Pin Names
-      , p5 = P0_9 
+      , p5 = P0_9
       , p6 = P0_8
       , p7 = P0_7
       , p8 = P0_6
       , p9 = P0_0
-     , p10 = P0_1
+      , p10 = P0_1
       , p11 = P0_18
       , p12 = P0_17
-     , p13 = P0_15
+      , p13 = P0_15
       , p14 = P0_16
       , p15 = P0_23
       , p16 = P0_24
@@ -76,7 +76,7 @@ enum PinName {
       , USBRX = P0_3
 
       // Not connected
-    , NC = (int)0xFFFFFFFF
+      , NC = (int)0xFFFFFFFF
 
 };
 typedef enum PinName PinName;
@@ -91,6 +91,6 @@ typedef enum PinMode PinMode;
 
 #ifdef __cplusplus
 }
-#endif 
+#endif
 
-#endif 
+#endif

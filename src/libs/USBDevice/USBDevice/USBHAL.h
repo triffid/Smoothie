@@ -70,8 +70,6 @@ public:
 
     static void _usbisr(void);
 
-    volatile uint32_t USBEpIntEn;
-
 protected:
     /* callbacks */
     //     virtual bool USB_Frame_Callback(uint16_t);
@@ -100,6 +98,7 @@ protected:
 private:
     void usbisr(void);
     static USBHAL * instance;
+    uint8_t can_transfer[32];
 };
 #endif
 

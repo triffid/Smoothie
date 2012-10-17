@@ -710,11 +710,6 @@ bool USBDevice::USBEvent_Frame(uint16_t Frame)
     return true;
 }
 
-// uint16_t USBDevice::lastFrame()
-// {
-//     return lastFrameIndex;
-// }
-
 void USBDevice::EP0setupCallback(void)
 {
 #ifdef DEBUG
@@ -882,7 +877,6 @@ bool USBDevice::readStart(uint8_t endpoint, uint32_t maxSize)
     return endpointRead(endpoint, maxSize) == EP_PENDING;
 }
 
-
 bool USBDevice::write(uint8_t endpoint, uint8_t * buffer, uint32_t size, uint32_t maxSize)
 {
     EP_STATUS result;
@@ -915,7 +909,6 @@ bool USBDevice::write(uint8_t endpoint, uint8_t * buffer, uint32_t size, uint32_
     return (result == EP_COMPLETED);
 }
 
-
 bool USBDevice::writeNB(uint8_t endpoint, uint8_t * buffer, uint32_t size, uint32_t maxSize)
 {
     EP_STATUS result;
@@ -942,8 +935,6 @@ bool USBDevice::writeNB(uint8_t endpoint, uint8_t * buffer, uint32_t size, uint3
     return (result == EP_COMPLETED);
 }
 
-
-
 bool USBDevice::readEP(uint8_t bEP, uint8_t * buffer, uint32_t * size, uint32_t maxSize)
 {
     EP_STATUS result;
@@ -961,7 +952,6 @@ bool USBDevice::readEP(uint8_t bEP, uint8_t * buffer, uint32_t * size, uint32_t 
 
     return (result == EP_COMPLETED);
 }
-
 
 bool USBDevice::readEP_NB(uint8_t endpoint, uint8_t * buffer, uint32_t * size, uint32_t maxSize)
 {
